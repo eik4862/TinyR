@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any, Callable, Tuple, Dict, NoReturn, final, Union
+from typing import List, Optional, Any, Callable, Tuple, Dict, final, Union
 from operator import add, sub, mul, mod, floordiv, truediv, pow, eq, ne, le, ge, gt, lt, and_, or_, matmul
-from ctypes import c_long, c_double, c_void_p, c_int, c_bool, CDLL, POINTER, Array
 from Error.Exception import ArrErr
 from math import ceil, floor
 from Core.Type import Errno
 from copy import deepcopy
+from CDLL.CLibrary import CLib
 
 
 class Arr:
@@ -136,6 +136,9 @@ class Arr:
 
     def __getitem__(self, item: int) -> Any:
         return self._elem[item]
+
+    def __setitem__(self, key: int, value: Any):
+        self._elem[key] = value
 
     def __len__(self) -> int:
         return self._dim[0]
@@ -461,9 +464,6 @@ class Arr:
 
 
 class Mat(Arr):
-    # Dynamic library containing C logic for matrix multiplication.
-    __LIBC: CDLL = None
-
     def __init__(self, elem: List, dim: List[int]) -> None:
         """
         Constructor of Arr class.
@@ -471,12 +471,6 @@ class Mat(Arr):
         :param elem: Element of the matrix.
         """
         super().__init__(elem, dim)
-
-    @classmethod
-    def init(cls) -> NoReturn:
-        cls.__LIBC = CDLL('./CDLL/GEMM.so')
-        Mat.__LIBC.GEMM.argtype = [POINTER(c_void_p), POINTER(c_void_p), POINTER(c_void_p), c_int, c_int, c_int, c_bool,
-                                   c_int]
 
     """
     BUILT-INS
@@ -510,7 +504,10 @@ class Mat(Arr):
 
             return Mat([self._elem[i] * other[i] for i in range(self._dim[0])], [self._dim[0], len(other)])
         elif type(other) == Mat:
-            return self.__GEMM__(other)
+            if self._dim[1] != other._dim[0]:
+                raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2=str(other._dim))
+
+            return CLib.GEMM(self, other)
         else:
             if self._dim[1] != 1:
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2='0(base type)')
@@ -523,7 +520,11 @@ class Mat(Arr):
 
         # TODO: Optimization
         if type(other) == Vec:
-            return other.promote(1).__GEMM__(self)
+            if self._dim[0] != len(other):
+                raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim),
+                             dim2=str([1, len(other)]))
+
+            return CLib.GEMM(other.promote(1), self)
         else:
             if self._dim[0] != 1:
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2='0(base type)')
@@ -662,42 +663,6 @@ class Mat(Arr):
                 elem[i] = elem[i].update(idx[1:], val)
 
                 return Mat(elem, self._dim.copy())
-
-    """
-    C FUNCTION WRAPPER
-    """
-
-    @staticmethod
-    def __C2Mat(mat: Array, dim: List[int]) -> Mat:
-        return Mat([Vec([mat[i][j] for j in range(dim[1])]) for i in range(dim[0])], dim.copy())
-
-    def __Mat2C(self, t: Any) -> Array:
-        m, n = self._dim[0], self._dim[1]
-
-        return (POINTER(t) * m)(*[(t * n)(*[self._elem[i][j] for j in range(n)]) for i in range(m)])
-
-    def __is_int(self) -> bool:
-        return all([all([type(it) == int for it in row]) for row in self._elem])
-
-    def __GEMM__(self, other: Mat) -> Mat:
-        """
-        Wrapper for C function GEMM(GEneral Matrix Multiplication).
-        GEMM uses multithread matrix multiplication algorithm for large matrix.
-        Since C differentiates int and float, it may cause type casting.
-
-        :raise ArrErr: Two matrices whose dimensions are not compatible raise exception with errno DIM_MISMATCH.
-        """
-        if self._dim[1] != other._dim[0]:
-            raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2=str(other._dim))
-
-        l, m, n = self._dim[0], self._dim[1], other._dim[1]
-        is_int: bool = self.__is_int() and other.__is_int()
-        t = c_long if is_int else c_double
-        res: Array = (POINTER(t) * l)(*[(t * n)() for _ in range(l)])
-
-        Mat.__LIBC.GEMM(self.__Mat2C(t), other.__Mat2C(t), res, l, m, n, is_int, 500)
-
-        return Mat.__C2Mat(res, [l, n])
 
     """
     PROMOTION LOGIC
@@ -879,6 +844,10 @@ class Mat(Arr):
         assert type(self) == Mat
 
         return self._dim[1]
+
+    @property
+    def is_sqr(self) -> bool:
+        return self._dim[0] == self._dim[1]
 
 
 @final

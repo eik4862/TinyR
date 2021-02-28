@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import final, List, NoReturn
+from typing import final, List, NoReturn, Any, Tuple
 from Error.Exception import FunErr
 from Core.Type import Errno
 from Class.Array import Mat, Vec
@@ -8,6 +8,7 @@ from copy import deepcopy
 from Core.SymbolTable import SymTab
 from Class.Function import Fun
 from Core.TypeSymbol import FunTSym, NumTSym, ArrTSym, BoolTSym
+from CDLL.CLibrary import CLib
 
 """
 MATRIX FUNCTIONS
@@ -241,3 +242,32 @@ class MatFun:
         else:
             return Mat([Vec([m])], [1, 1])
 
+    @staticmethod
+    def lu(m: Mat, com: bool = False) -> Tuple[Mat, Vec]:
+        if not m.is_sqr:
+            raise NotImplementedError
+
+        m, perm = CLib.LU(m)
+
+        return m, perm
+
+#
+# if __name__ == '__main__':
+#     from timeit import default_timer as timer
+#     from random import random
+#     from ctypes import c_long, c_double, c_void_p, c_int, c_bool, CDLL, POINTER, Array
+#
+#     N = 1000
+#     A = Mat([Vec([random() for _ in range(N)]) for _ in range(N)], [N, N])
+#
+#
+#     libc = CDLL('../CDLL/LU.so')
+#     libc.LU.argtype = [POINTER(POINTER(c_double)), POINTER(c_int), c_int]
+#
+#     start = timer()
+#     A = (POINTER(c_double) * N)(*[(c_double * N)(*[A[i][j] for j in range(N)]) for i in range(N)])
+#     perm = (c_int * N)(*[i for i in range(N)])
+#     libc.LU(A, perm, N)
+#     print(f'  @elapsed: {round((timer() - start), 4)}s')
+#
+#

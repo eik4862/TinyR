@@ -5,7 +5,7 @@ import signal
 from Util.Printer import Printer
 from Util.Reader import Reader
 from typing import NoReturn, ClassVar, final, TextIO
-from Class.Array import Mat
+from CDLL.CLibrary import CLib
 from Function.MatrixFunction import MatFun
 
 
@@ -42,5 +42,5 @@ class InitMan:
         Reader.inst(src=src)
         Printer.inst(dest=dest)
 
-        Mat.init()
+        CLib.init()
         MatFun.init()
