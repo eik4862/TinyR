@@ -159,29 +159,57 @@ class Arr:
     """
     INDEXING LOGIC
     
-    It supports three types of indexing mode: indexing all, indexing by list of indices, and indexing by a single index.
+    It supports three types of indexing modes: indexing all, indexing by index list, and indexing by a single index.
+        1. Indexing all: a[] means indexing all elements in a.
+        2. Indexing by index list: a[[i1, ..., ip]] means indexing elements of a at i1, ..., ip.
+        3. Indexing by a single index: a[i] means indexing a single element of a at i.
+    Here, a is one of array, matrix, or vector.
+    Since the first two indexing modes yield multiple elements, they should be packed up in array (or matrix or vector)
+    and thus there is no dimension drop.
+    The last one, however, does have a dimension drop since it extracts a single element.
     
+    Further, indexing can be chained. That is, a[i1, ..., ip] is allowed means:
+    First, index from a using i1. Then index from each of previously indexed items using i2, and so on.
+        
+    Summarizing, we define index chain and indexing rule as follows:
+        idx_chain = None, idx_chain
+                  | [i1, ..., ip], idx_chain
+                  | i, idx_chain
+                  | Nil
+                  
+        1. Idx(a, [None]) => a                                                                    [IdxAllBase]
+        2. Idx(a, [[i1, ..., ip]]) => [ai1, ..., aip]                                             [IdxListBase]
+        3. Idx(a, [i]) => ai                                                                      [IdxSnglBase]
+        4. Idx(a, [None, idx_chain]) => [Idx(a1, idx_chain), ..., Idx(ap, idx_chain)]             [IdxAll]
+        5. Idx(a, [[i1, ..., ip], idx_chain]) => [Idx(ai1, idx_chain), ..., Idx(aip, idx_chain)]  [IdxList]
+        6. Idx(a, [i, idx_chain]) => Idx(ai, idx_chain)                                           [IdxSngl]
+    Here, a = [a1, ..., aq].
     """
 
     def get(self, idx: List) -> Any:
         """
-        Helper for indexing.
-        It recursively visits elements in the array and returns indexed elements.
+        Indexes using index chain idx.
 
-        idx_list = Void, idx_list
-                 | Arr, idx_list
-                 | Num, idx_list
-                 | Nil
+        Naive implementation of all six rules is trivial but quite laborious.
+        As a simple trick, it uses the fact that for array a which has depth(# of dimension) d,
+        and index chain idx_chain of length l (<= d), a[idx_chain] = a[idx_chain, None, ... None (d - l of Nones)].
+        Utilizing this, we can delegate the implementation of base cases to Vec class.
+        Here, other indexing rules are implemented.
+        Note that Mat class does not need to override this since it has the same logical structure.
 
-        hlpr(a, [Nil]) => a
-        hlpr([a1, ..., ap], [Void, idx_list]) => [hlpr(a1, [idx_list]), ..., hlpr(ap, [idx_list])]
-        hlpr([a1, ..., ap], [[i1, ..., iq], idx_list]) => [hlpr(ai1, [idx_list]), ..., hlpr(aiq, [idx_list])]
-        hlpr([a1, ..., ap], [i, idx_list]) => hlpr(ai, [idx_list])
+        Promotion may be needed if the length of index chain exceeds the depth of an array.
+        One tricky case is the case where base type is indexed.
+        However, since base types are not subclasses of Arr, this case should be handled outside of this module.
+        Class Op will do this.
 
-        :param src: List of elements to be visited.
-        :param idx: List of indices.
+        Float can be used as an index, and it will be rounded.
+        However, this may cause unexpected behaviors due to rounding.
+
+        :param idx: Index chain.
 
         :return: Indexed elements.
+
+        :raise ArrErr[EMPTY_IDX]: If index list is empty.
         """
         if len(idx) > self.dept:
             return self.promote(len(idx) - self.dept).get(idx)
@@ -189,6 +217,7 @@ class Arr:
             idx += [None] * (self.dept - len(idx))
 
         if idx[0] is None:
+            # [IdxAll]
             res = [it.get(idx[1:]) for it in self._elem]
 
             if type(res[0]) == Vec:
@@ -198,6 +227,7 @@ class Arr:
             else:
                 return Vec(res)
         elif type(idx[0]) == Vec:
+            # [IdxList]
             idx_set: Vec = idx[0]
             res: List = []
 
@@ -219,6 +249,7 @@ class Arr:
             else:
                 return Vec(res)
         else:
+            # [IdxSngl]
             i: int = round(idx[0])
 
             if i < 0 or i >= self._dim[0]:
@@ -226,7 +257,55 @@ class Arr:
 
             return self._elem[i].get(idx[1:])
 
+    """
+    UPDATING LOGIC
+    
+    It supports updating elements of an array and its subclasses using indexing modes described above.
+    This functionality will be used to implement assignment.
+    
+    Like operators acting b/w arrays (and its subclasses) it supports two types of update: distributive update and
+    componentiwe update.
+    Updating rules are as follows:
+        1. Up(a, [None], b) => [b, ..., b].                                                   [UpIdxAllDistBase]
+        2. Up(a, [None, idx_chain], b) => Up(ai, [idx_chain], b) for all i.                   [UpIdxAllDist]
+        3. Up(a, [[i1, ..., ip]], b) => a whose elements at i1, ..., ip are replaced with b.  [UpIdxListDistBase]
+        4. Up(a, [[i1, ..., ip], idx_chain], b) => Up(aij, [idx_chain], b) for all j.         [UpIdxListDist]
+        5. Up(a, [None], c) => [c1, ..., cq].                                                 [UpIdxAllCompBase]
+        6. Up(a, [None, idx_chain], c) => Up(ai, [idx_chain], ci) for all i.                  [UpIdxAllComp]
+        7. Up(a, [[i1, ..., ip]], c) => a whose elements at ij are replaced with cj.          [UpIdxListCompBase]
+        8. Up(a, [[i1, ..., ip], idx_chain], c) => Up(aij, [idx_chain], cj) for all j.        [UpIdxListComp]
+        9. Up(a, [i], d) => a whose element at i is replaced with d.                          [UpIdxSnglBase]
+        10. Up(a, [i, idx_chain], d) => Up(ai, [idx_chain], d).                               [UpIdxSngl]
+    Here, b is a base type object, a = [a1, ... , aq], and c = [c1, ..., cq].
+    Rules are applied following the order as above.
+    """
+
     def update(self, idx: List, val: Any) -> Any:
+        """
+        Update elements indicated by idx to val.
+
+        Naive implementation of all ten rules is trivial but very laborious.
+        As in Vec.get, it delegates the implementation of base cases to Vec class.
+        Here, other five rules are implemented.
+
+        Promotion of self may be needed if the length of index chain exceeds the depth of an array.
+        Promotion of val may be needed if distributive rules are applied and
+        the depth of indexing result exceeds the depth of val.
+        Unlike the promotion of self, that of val is one is tricky since it needs information on the indexing result.
+        Fortunately, the depth of indexing result can be inferred by semantic checker 'before' interpretation.
+        Since such information is invisible here, promotion of val will be handled outside of this module.
+        It just assumes that val is already promoted properly.
+        Like Arr.get, updating base type by indexing it is another tricky problem.
+        This will be handled outside of this module. Class Interp will do this.
+
+        Float can be used as an index, and it will be rounded.
+        However, this may cause unexpected behaviors due to rounding.
+
+        :param idx: Index chain.
+        :param val: Value to be assigned.
+
+        :return: Updated array.
+        """
         if len(idx) > self.dept:
             return self.promote(len(idx) - self.dept).update(idx, val)
         elif len(idx) < self.dept:
@@ -234,11 +313,13 @@ class Arr:
 
         if isinstance(val, Arr):
             if idx[0] is None:
+                # [UpIdxAllComp]
                 if self._dim[0] != len(val):
                     raise ArrErr(Errno.ASGN_N_MISS, need=self._dim[0], given=len(val))
 
                 return Arr([self._elem[i].update(idx[1:], val[i]) for i in range(self._dim[0])], self._dim.copy())
             elif type(idx[0]) == Vec:
+                # [UpIdxListComp]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -255,6 +336,7 @@ class Arr:
 
                 return Arr(elem, self._dim.copy())
             else:
+                # [UpIdxSngl]
                 i: int = round(idx[0])
                 elem: List = deepcopy(self._elem)
 
@@ -266,8 +348,10 @@ class Arr:
                 return Arr(elem, self._dim.copy())
         else:
             if idx[0] is None:
+                # [UpIdxAllDist]
                 return Arr([it.update(idx[1:], val) for it in self._elem], self._dim.copy())
             elif type(idx[0]) == Vec:
+                # [UpIdxListDist]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -281,6 +365,7 @@ class Arr:
 
                 return Arr(elem, self._dim.copy())
             else:
+                # [UpIdxSngl]
                 i: int = round(idx[0])
                 elem: List = deepcopy(self._elem)
 
@@ -300,7 +385,7 @@ class Arr:
     Numeric(scala) can be considered as a vector of length 1.
     Vector of length n can be considered as a matrix of size 1 by n. (Note that we employ row-major policy.)
     Similarly, m by n matrix can be considered as an array with dimension 1 by m by n.
-    This mathematical concept is supported with help of these promotion & degrading logic.
+    This mathematical concept is supported with help of these promotion & degradation logic.
     """
 
     def promote(self, n: int) -> Arr:
@@ -325,8 +410,8 @@ class Arr:
         """
         Degrades an array n times.
 
-        Degrading 1 by ... by 1 (m of 1s) by ... array. n(<=m) times yields 1 by ... by 1 (m - n of 1s) by ... array.
-        Note that when the # of dimensions becomes less than 3, it returns a matrix or vector, not array.
+        Degrading 1 by ... by 1 (m of 1s) by ... array n(<=m) times yields 1 by ... by 1 (m - n of 1s) by ... array.
+        Note that when # of dimensions becomes less than 3, it returns a matrix or vector, not array.
         Also, it does NOT check whether the dimension to be stripped is actually redundant or not.
 
         :param n: # of degradations to be applied.
@@ -405,6 +490,7 @@ class Arr:
         :raise ArrErr[DIM_MISMATCH]: If # of elements does not match during applying rule [BinOpComp].
         """
         if isinstance(other, Arr):
+            # [BinOpComp]
             if self.dept > other.dept:
                 return op(self, other.promote(self.dept - other.dept))
             elif self.dept < other.dept:
@@ -416,6 +502,7 @@ class Arr:
 
             return Arr([op(self._elem[i], other._elem[i]) for i in range(self._dim[0])], self._dim.copy())
         else:
+            # [BinOpDist]
             return Arr([op(it, other) for it in self._elem], self._dim.copy())
 
     def __apply_matmul(self, other: Any, op: Callable) -> Arr:
@@ -436,6 +523,7 @@ class Arr:
         """
 
         if type(other) == Arr:
+            # [BinOpComp]
             if self.dept > other.dept:
                 return op(self, other.promote(self.dept - other.dept))
             elif self.dept < other.dept:
@@ -448,6 +536,7 @@ class Arr:
             elem: List = [op(self._elem[i], other._elem[i]) for i in range(self._dim[0])]
             dim: List[int] = [self._dim[0], *elem[0].dim]
         else:
+            # [BinOpDist]
             elem: List = [op(it, other) for it in self._elem]
             dim: List[int] = [self._dim[0], *elem[0].dim]
 
@@ -687,7 +776,24 @@ class Mat(Arr):
 
     __repr__ = __str__
 
+    """
+    UPDATING LOGIC
+
+    Refer to the comments of Arr class.
+    """
+
     def update(self, idx: List, val: Any) -> Any:
+        """
+        Update elements indicated by idx to val.
+
+        For details, refer to the comments of Arr.update.
+        Note that Mat class cannot just inherit update method from Arr class because the return types are different.
+
+        :param idx: Index chain.
+        :param val: Value to be assigned.
+
+        :return: Updated matrix.
+        """
         if len(idx) > 2:
             return self.promote(len(idx) - 1).update(idx, val)
         elif len(idx) < 2:
@@ -695,11 +801,13 @@ class Mat(Arr):
 
         if isinstance(val, Mat):
             if idx[0] is None:
+                # [UpIdxAllComp]
                 if self._dim[0] != len(val):
                     raise ArrErr(Errno.ASGN_N_MISS, need=self._dim[0], given=len(val))
 
                 return Mat([self._elem[i].update(idx[1:], val[i]) for i in range(self._dim[0])], self._dim.copy())
             elif type(idx[0]) == Vec:
+                # [UpIdxListComp]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -716,6 +824,7 @@ class Mat(Arr):
 
                 return Mat(elem, self._dim.copy())
             else:
+                # [UpIdxSngl]
                 i: int = round(idx[0])
                 elem: List = deepcopy(self._elem)
 
@@ -727,8 +836,10 @@ class Mat(Arr):
                 return Mat(elem, self._dim.copy())
         else:
             if idx[0] is None:
+                # [UpIdxAllDist]
                 return Mat([it.update(idx[1:], val) for it in self._elem], self._dim.copy())
             elif type(idx[0]) == Vec:
+                # [UpIdxListDist]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -742,6 +853,7 @@ class Mat(Arr):
 
                 return Mat(elem, self._dim.copy())
             else:
+                # [UpIdxSngl]
                 i: int = round(idx[0])
                 elem: List = deepcopy(self._elem)
 
@@ -957,6 +1069,7 @@ class Vec(Mat):
 
     This class is the end of inheritance. No further inheritance is allowed.
     """
+
     def __init__(self, elem: List) -> None:
         super().__init__(elem, [len(elem)])
 
@@ -1066,13 +1179,34 @@ class Vec(Mat):
 
     __repr__ = __str__
 
+    """
+    INDEXING LOGIC
+
+    Refer to the comments of Arr class.
+    """
+
     def get(self, idx: List) -> Any:
+        """
+        Implements indexing rules.
+
+        Here, base cases of indexing rules are implemented.
+        For detail, refer to the comments of Arr.get.
+
+        :param idx: Index chain.
+
+        :return: Indexed elements.
+
+        :raise ArrErr[EMPTY_IDX]: If index list is empty.
+        :raise ArrErr[IDX_BOUND]: If index is out of bound.
+        """
         if len(idx) > 1:
             return self.promote(len(idx) - 1).get(idx)
 
         if idx[0] is None:
+            # [IdxAllBase]
             return Vec(deepcopy(self._elem))
         elif type(idx[0]) == Vec:
+            # [IdxListBase]
             idx_set: Vec = idx[0]
             res: List = []
 
@@ -1089,12 +1223,19 @@ class Vec(Mat):
 
             return Vec(res)
         else:
+            # [IdxSnglBase]
             i: int = round(idx[0])
 
             if i < 0 or i >= self._dim[0]:
                 raise ArrErr(Errno.IDX_BOUND, idx=i)
 
             return self._elem[i]
+
+    """
+    UPDATING LOGIC
+
+    Refer to the comments of Arr class.
+    """
 
     def update(self, idx: List, val: Any) -> Any:
         if len(idx) > 1:
@@ -1255,3 +1396,8 @@ class Vec(Mat):
             h_use += 1
 
         return (buf.rstrip(), h - h_use) if h_remain else buf.rstrip()
+
+
+"""
+COMMENT WRITTEN: 2021.3.2.
+"""

@@ -267,3 +267,8 @@ class CLib:
         cls.__LIBC['MatOp'].QR(A, v, flag, m, n, c_double(tol))
 
         return cls.__C2Mat(A, [m, n], True), cls.__C2Vec(v, m), flag.contents.value
+
+
+"""
+COMMENT WRITTEN: 2021.3.2.
+"""

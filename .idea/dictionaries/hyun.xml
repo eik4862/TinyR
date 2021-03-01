@@ -8,6 +8,7 @@
       <w>chol</w>
       <w>cholesky</w>
       <w>cmplx</w>
+      <w>componentiwe</w>
       <w>componentwise</w>
       <w>componentwisely</w>
       <w>dest</w>
@@ -20,6 +21,7 @@
       <w>imple</w>
       <w>incomp</w>
       <w>inhomo</w>
+      <w>interpre</w>
       <w>kword</w>
       <w>lbra</w>
       <w>lcur</w>
@@ -49,6 +51,7 @@
       <w>rpar</w>
       <w>sgntr</w>
       <w>smpl</w>
+      <w>sngl</w>
       <w>stdin</w>
       <w>stringfy</w>
       <w>strt</w>
