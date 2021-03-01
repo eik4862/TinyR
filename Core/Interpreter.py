@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, Optional
+from typing import NoReturn, ClassVar, final, Optional, List, Any
 from Core.Type import TokT, Errno, OpT, T
 from timeit import default_timer as timer
 from Core.AST import AST
-from Class.Array import Arr, Vec
-from Class.ArrayFactory import ArrFact
+from Class.Array import Arr, Vec, Mat
 from Error.Exception import InterpErr
 from Util.Printer import Printer
 from Core.SymbolTable import SymTab
+from copy import deepcopy
 
 
 @final
@@ -89,6 +89,44 @@ class Interp:
 
             ast.tok.v = ast.ch[1].tok.v
 
+    def __interp_arr(self, ast: AST) -> NoReturn:
+        for node in ast.ch:
+            self.__interp_hlpr(node)
+
+        elem: List = []
+        dept: int = ast.t.dept
+        dim_old: List[int] = []
+
+        for i in range(len(ast.ch)):
+            curr_v: Any = ast.ch[i].tok.v
+
+            if isinstance(curr_v, Arr):
+                elem.append(deepcopy(curr_v).promote(dept - curr_v.dept - 1))
+                dim_new: List[int] = elem[-1].dim
+            elif dept > 1:
+                elem.append(Vec([deepcopy(curr_v)]).promote(dept - 2))
+                dim_new: List[int] = elem[-1].dim
+            else:
+                elem.append(deepcopy(curr_v))
+                dim_new: List[int] = []
+
+            if len(dim_old) != 0 and dim_old != dim_new:
+                raise InterpErr(ast.tok.pos, self.__line, Errno.DIM_MISMATCH, op='array construction',
+                                dim1='0(base type)' if ast.ch[i - 1].t.base else str(ast.ch[i - 1].tok.v.dim),
+                                dim2='0(base type)' if ast.ch[i].t.base else str(curr_v.dim))
+
+            dim_old = dim_new
+
+        if dept == 1:
+            ast.tok.v = Vec(elem)
+        elif dept == 2:
+            ast.tok.v = Mat(elem, [len(ast.ch), *dim_old])
+        else:
+            ast.tok.v = Arr(elem, [len(ast.ch), *dim_old])
+
+    def __interp_strt(self, ast: AST) -> NoReturn:
+        pass
+
     def __interp_hlpr(self, ast: AST) -> NoReturn:
         """
         Traverses AST and interprets.
@@ -111,15 +149,9 @@ class Interp:
             else:
                 self.__interp_op(ast)
         elif ast.tok.t == TokT.ARR:
-            for node in ast.ch:
-                self.__interp_hlpr(node)
-
-            try:
-                ast.tok.v = ArrFact.create(ast)
-            except InterpErr as e:
-                e.line = self.__line
-
-                raise e
+            self.__interp_arr(ast)
+        elif ast.tok.t == TokT.STRT:
+            self.__interp_strt(ast)
         elif ast.tok.t == TokT.FUN:
             for node in ast.ch:
                 self.__interp_hlpr(node)

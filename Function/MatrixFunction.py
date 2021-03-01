@@ -84,6 +84,24 @@ class MatFun:
                 FunTSym([ArrTSym(NumTSym(), 2)], ArrTSym(NumTSym(), 2))
                 )
         )
+        SymTab.inst().update_kw(
+            'lu',
+            Fun(MatFun.lu,
+                FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()], ArrTSym(NumTSym(), 2))
+                )
+        )
+        SymTab.inst().update_kw(
+            'chol',
+            Fun(MatFun.chol,
+                FunTSym([ArrTSym(NumTSym(), 2)], ArrTSym(NumTSym(), 2))
+                )
+        )
+        SymTab.inst().update_kw(
+            'qr',
+            Fun(MatFun.qr,
+                FunTSym([ArrTSym(NumTSym(), 2)], ArrTSym(NumTSym(), 2))
+                )
+        )
 
     @staticmethod
     def o_mat(n: int) -> Mat:
@@ -242,32 +260,90 @@ class MatFun:
         else:
             return Mat([Vec([m])], [1, 1])
 
+    # TODO: Implement me
     @staticmethod
-    def lu(m: Mat, com: bool = False) -> Tuple[Mat, Vec]:
+    def lu(m: Mat, cp: bool = False, tol: float = 1e-8) -> Tuple[Mat, Vec]:
+        if m.ncol == 0:
+            raise NotImplementedError
+
+        if cp:
+            m, p, q, flag = CLib.LU(m, cp, tol)
+            print(m.format(100, 100, 10))
+            print(p.format(100, 100, 10))
+            print(q.format(100, 100, 10))
+            print(flag)
+        else:
+            m, p, flag = CLib.LU(m, cp, tol)
+            print(m.format(100, 100, 10))
+            print(p.format(100, 100, 10))
+            print(flag)
+
+        return m
+
+    # TODO: Implement me
+    @staticmethod
+    def chol(m: Mat, tol: float = 1e-8):
         if not m.is_sqr:
             raise NotImplementedError
 
-        m, perm = CLib.LU(m)
+        m, flag = CLib.CHOL(m, tol)
+        print(m.format(100, 100, 10))
+        print(flag)
 
-        return m, perm
+        return m
 
-#
-# if __name__ == '__main__':
-#     from timeit import default_timer as timer
-#     from random import random
-#     from ctypes import c_long, c_double, c_void_p, c_int, c_bool, CDLL, POINTER, Array
-#
-#     N = 1000
-#     A = Mat([Vec([random() for _ in range(N)]) for _ in range(N)], [N, N])
-#
-#
-#     libc = CDLL('../CDLL/LU.so')
-#     libc.LU.argtype = [POINTER(POINTER(c_double)), POINTER(c_int), c_int]
-#
-#     start = timer()
-#     A = (POINTER(c_double) * N)(*[(c_double * N)(*[A[i][j] for j in range(N)]) for i in range(N)])
-#     perm = (c_int * N)(*[i for i in range(N)])
-#     libc.LU(A, perm, N)
-#     print(f'  @elapsed: {round((timer() - start), 4)}s')
-#
-#
+    @staticmethod
+    def qr(m: Mat, tol: float = 1e-8):
+        if m.nrow < m.ncol:
+            raise NotImplementedError
+
+        m, v, flag = CLib.QR(m, tol)
+        print(m.format(100, 100, 10))
+        print(v.format(100, 100, 10))
+        print(flag)
+
+        return m
+
+
+if __name__ == '__main__':
+    A: Mat = Mat([Vec([0.3769721, 0.7205735, -0.8531228]),
+                  Vec([0.3015484, 0.9391210, 0.9092592]),
+                  Vec([-1.0980232, -0.2293777, 1.1963730]),
+                  Vec([-1.1304059, 1.7591313, -0.3715839]),
+                  Vec([-2.7965343, 0.1173668, -0.1232602])], [5, 3])
+
+    # x=[[0.3769721, 0.7205735, -0.8531228],[0.3015484, 0.9391210, 0.9092592],[-1.0980232, -0.2293777, 1.1963730],[-1.1304059, 1.7591313, -0.3715839],[-2.7965343, 0.1173668, -0.1232602]]
+    # A = MatFun.t(A)
+    # m, n = 3, 5
+    # v: Vec = Vec([0] * m)
+    #
+    # for i in range(m):
+    #     norm = 0
+    #     s = -1 if A[i][i] < 0 else 1
+    #
+    #     for j in range(n - i):
+    #         norm += A[i][i + j] ** 2
+    #
+    #     norm = sqrt(norm)
+    #     u1 = A[i][i] + s * norm
+    #     v[i] = u1 / (s * norm)
+    #
+    #     for j in range(n - i - 1):
+    #         A[i][i + j + 1] /= u1
+    #
+    #     A[i][i] = -s * norm
+    #
+    #     for j in range(m - i - 1):
+    #         tmp = A[i + j + 1][i]
+    #
+    #         for k in range(n - i - 1):
+    #             tmp += A[i][i + k + 1] * A[i + j + 1][i + k + 1]
+    #
+    #         A[i + j + 1][i] -= tmp * v[i]
+    #
+    #         for k in range(n - i - 1):
+    #             A[i + j + 1][i + k + 1] -= tmp * A[i][i + k + 1] * v[i]
+    #     # print(A.format(100, 100, 10))
+    #
+    # print(MatFun.t(A).format(100, 100, 10))
+    # print(v.format(100, 100, 10))

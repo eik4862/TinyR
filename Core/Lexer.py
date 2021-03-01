@@ -20,7 +20,7 @@ class Lexer:
     __inst: ClassVar[Lexer] = None
     # Operator characters.
     __OP: Final[ClassVar[Set[str]]] = {'^', '*', '+', '-', ':', '%', '*', '/', '<', '=', '>', '!', '&', '|', '(', ')',
-                                       '[', ']', ','}
+                                       '[', ']', '{', '}', ','}
 
     @classmethod
     def inst(cls, *args, **kwargs) -> Lexer:
@@ -295,6 +295,14 @@ class Lexer:
             self.__step()
 
             return Tok(TokT.OP, OpT.RBRA, self.__pos - 1)
+        elif self.__curr_char == '{':
+            self.__step()
+
+            return Tok(TokT.OP, OpT.LCUR, self.__pos - 1)
+        elif self.__curr_char == '}':
+            self.__step()
+
+            return Tok(TokT.OP, OpT.RCUR, self.__pos - 1)
         else:
             self.__step()
 

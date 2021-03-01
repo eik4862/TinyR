@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any, Callable, Tuple, Dict, final, Union
+from typing import List, Optional, Any, Callable, Tuple, Dict, final, Union, Final
 from operator import add, sub, mul, mod, floordiv, truediv, pow, eq, ne, le, ge, gt, lt, and_, or_, matmul
 from Error.Exception import ArrErr
 from math import ceil, floor
@@ -464,6 +464,8 @@ class Arr:
 
 
 class Mat(Arr):
+    __BLK_SZ: Final[int] = 500
+
     def __init__(self, elem: List, dim: List[int]) -> None:
         """
         Constructor of Arr class.
@@ -507,7 +509,7 @@ class Mat(Arr):
             if self._dim[1] != other._dim[0]:
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2=str(other._dim))
 
-            return CLib.GEMM(self, other)
+            return CLib.GEMM(self, other, Mat.__BLK_SZ)
         else:
             if self._dim[1] != 1:
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2='0(base type)')
@@ -524,7 +526,7 @@ class Mat(Arr):
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim),
                              dim2=str([1, len(other)]))
 
-            return CLib.GEMM(other.promote(1), self)
+            return CLib.GEMM(other.promote(1), self, Mat.__BLK_SZ)
         else:
             if self._dim[0] != 1:
                 raise ArrErr(Errno.DIM_MISMATCH, op='matrix multiplication', dim1=str(self._dim), dim2='0(base type)')

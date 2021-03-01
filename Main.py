@@ -22,19 +22,19 @@ if __name__ == '__main__':
         line: str = Reader.inst().readline()
 
         # Lexer.inst().test(line)
-        ast: AST = Parser.inst().parse(line)
-        SemanticChk.inst().chk(ast, line)
-        Interp.inst().test(ast, line)
+        # ast: AST = Parser.inst().parse(line)
+        # SemanticChk.inst().test(ast, line)
+        # Interp.inst().test(ast, line)
 
-        # try:
-        #     ast: AST = Parser.inst().parse(line)
-        #
-        #     if ast is None:
-        #         continue
-        #
-        #     ast = SemanticChk.inst().chk(ast, line)
-        #     res: str = Interp.inst().interp(ast, line)
-        # except Err as e:
-        #     Printer.inst().print(e.msg)
-        # else:
-        #     Printer.inst().print(res)
+        try:
+            ast: AST = Parser.inst().parse(line)
+
+            if ast is None:
+                continue
+
+            ast = SemanticChk.inst().chk(ast, line)
+            res: str = Interp.inst().interp(ast, line)
+        except Err as e:
+            Printer.inst().print(e.msg)
+        else:
+            Printer.inst().print(res)

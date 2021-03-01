@@ -13,6 +13,8 @@ class TokT(IntEnum):
     VOID = auto()
     FUN = auto()
     KWARG = auto()
+    STRT = auto()
+    MEM = auto()
     EOF = auto()
 
     def __str__(self) -> str:
@@ -46,6 +48,8 @@ class OpT(IntEnum):
     RPAR = auto()
     LBRA = auto()
     RBRA = auto()
+    LCUR = auto()
+    RCUR = auto()
     COM = auto()
     ASGN = auto()
 
@@ -63,7 +67,9 @@ class Errno(IntEnum):
     NOT_DEFINE = auto()
     FUN_CALL_MISS = auto()
     KWARG_MISS = auto()
+    MEMID_MISS = auto()
     INVALID_LVAL = auto()
+    ID_DUP = auto()
     ASGN_T_MISS = auto()
     ASGN_N_MISS = auto()
     INHOMO_ELEM = auto()
@@ -84,4 +90,5 @@ class T(IntEnum):
     VOID = auto()
     ARR = auto()
     FUN = auto()
+    STRT = auto()
     NA = auto()

@@ -79,6 +79,8 @@ class ParserErr(Err):
             msg += Printer.as_red(f'[Invalid syntax] Function call at {self._pos} is not complete.')
         elif self._errno == Errno.KWARG_MISS:
             msg += Printer.as_red('[Invalid syntax] Only keyword arguments can be placed here.')
+        elif self._errno == Errno.MEMID_MISS:
+            msg += Printer.as_red('[Invalid syntax] Member id is missing.')
 
         return msg
 
@@ -110,6 +112,9 @@ class SemanticChkErr(Err):
         elif self._errno == Errno.INVALID_LVAL:
             msg += Printer.as_red(
                 f'[Semantic error] The left hand side of assignment at {self._pos} cannot be a l-value.')
+        elif self._errno == Errno.ID_DUP:
+            id_:str = self.__info['id_']
+            msg += Printer.as_red(f'[Semantic error] Struct id {id_} is duplicated.')
 
         return msg
 
@@ -129,7 +134,10 @@ class InterpErr(Err):
             msg += Printer.as_red(f'               Message from the kernel: {k_msg}')
         elif self._errno == Errno.NOT_IMPLE:
             msg += Printer.as_red(f'[Not implemented] This functionality is not implemented yet. Sorry.')
-
+        elif self._errno == Errno.DIM_MISMATCH:
+            op, dim1, dim2 = self.__info['op'], self.__info['dim1'], self.__info['dim2']
+            msg += Printer.as_red(f'[Invalid operation] Dimension mismatch occurred during {op}.\n')
+            msg += Printer.as_red(f'                    Dimensions {dim1} and {dim2} are not compatible.')
         return msg
 
 

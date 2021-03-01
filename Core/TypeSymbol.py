@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import final, Optional, List
+from typing import final, Optional, List, Dict
 from Core.Type import T
 
 
@@ -44,6 +44,9 @@ class TSym:
             return self.elem.__t == other.elem.__t and self.dept == other.dept
         elif self.__t == T.FUN:
             return self.args == other.args and self.ret == other.ret
+        elif self.__t == T.STRT:
+            return self.elem == other.elem
+
         return False
 
     def __le__(self, other: TSym) -> bool:
@@ -76,6 +79,18 @@ class TSym:
                 return False
 
             return all([self.args[i] <= other.args[i] for i in range(len(self.args))]) and self.ret <= other.ret
+
+        if self.__t == other.__t == T.STRT:
+            if len(self.elem) != len(other.elem):
+                return False
+
+            for k, t1 in self.elem:
+                t2: Optional[TSym] = other.elem.get(k, None)
+
+                if t2 is None or not (t1 <= t2):
+                    return False
+
+            return True
 
         return False
 
@@ -258,6 +273,8 @@ class FunTSym(TSym):
 
         return f'({args}) => {self.__ret}'
 
+    __repr__ = __str__
+
     @property
     def args(self) -> List[TSym]:
         return self.__args
@@ -265,3 +282,22 @@ class FunTSym(TSym):
     @property
     def ret(self) -> TSym:
         return self.__ret
+
+
+@final
+class StrtTSym(TSym):
+    def __init__(self, elem: Dict[str, TSym] = None) -> None:
+        if elem is None:
+            elem = {}
+
+        super().__init__(T.STRT)
+        self.__elem: Dict[str, TSym] = elem
+
+    def __str__(self) -> str:
+        return str(self.__elem)
+
+    __repr__ = __str__
+
+    @property
+    def elem(self) -> Dict[str, TSym]:
+        return self.__elem

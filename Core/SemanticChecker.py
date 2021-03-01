@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, List, Optional, Tuple, Any
+from typing import NoReturn, ClassVar, final, List, Optional, Tuple, Any, Dict
 from Core.Type import TokT, Errno, T, OpT
 from timeit import default_timer as timer
 from Core.AST import AST
-from Core.TypeSymbol import TSym, NumTSym, StrTSym, BoolTSym, VoidTSym, FunTSym, ArrTSym
+from Core.TypeSymbol import TSym, NumTSym, StrTSym, BoolTSym, VoidTSym, FunTSym, ArrTSym, StrtTSym
 from Error.Exception import SemanticChkErr
-from Class.ArrayFactory import ArrFact
 from Core.Operator import Arith, Logi, Comp, Sp
 from Core.SymbolTable import SymTab
 from Core.Parser import Parser
@@ -38,13 +37,24 @@ class SemanticChk:
     SEMANTIC CHECKING LOGIC
     """
 
+    def __chk_mem(self, ast: AST) -> NoReturn:
+        if ast.lval:
+            raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
+
+        self.__chk_hlpr(ast.ch[0])
+
+        if ast.ch[0].t.t == T.NA:
+            raise SemanticChkErr(ast.ch[0].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[0].tok.v)
+
+        ast.t = ast.ch[0].t
+
     def __chk_kwarg(self, ast: AST) -> NoReturn:
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
         self.__chk_hlpr(ast.ch[0])
 
-        if ast.ch[0].t == T.NA:
+        if ast.ch[0].t.t == T.NA:
             raise SemanticChkErr(ast.ch[0].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[0].tok.v)
 
         ast.t = ast.ch[0].t
@@ -166,6 +176,31 @@ class SemanticChk:
 
         ast.t = t
 
+    def __chk_strt(self, ast: AST) -> NoReturn:
+        if ast.lval:
+            raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
+
+        for node in ast.ch:
+            self.__chk_hlpr(node)
+
+        id_: List[str] = [node.tok.v for node in ast.ch]
+        ch_t: List[TSym] = [node.t for node in ast.ch]
+
+        if len(ch_t) == 0:
+            t: TSym = StrtTSym()
+        else:
+            elem_t: Dict[str, TSym] = {}
+
+            for i in range(len(id_)):
+                if id_[i] in elem_t:
+                    raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.ID_DUP, id_=id_[i])
+
+                elem_t[id_[i]] = ch_t[i]
+
+            t: TSym = StrtTSym(elem_t)
+
+        ast.t = t
+
     def __chk_fun(self, ast: AST) -> NoReturn:
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
@@ -280,6 +315,8 @@ class SemanticChk:
             ast.t = TSym() if var_t is None else var_t
         elif ast.tok.t == TokT.KWARG:
             self.__chk_kwarg(ast)
+        elif ast.tok.t == TokT.MEM:
+            self.__chk_mem(ast)
         elif ast.tok.t == TokT.OP:
             if ast.tok.v == OpT.IDX:
                 self.__chk_idx(ast)
@@ -289,6 +326,8 @@ class SemanticChk:
                 self.__chk_op(ast)
         elif ast.tok.t == TokT.ARR:
             self.__chk_arr(ast)
+        elif ast.tok.t == TokT.STRT:
+            self.__chk_strt(ast)
         else:
             self.__chk_fun(ast)
 

@@ -47,7 +47,6 @@ class Parser:
 
         # Since assignment is right to left associative.
         if self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.ASGN:
-
             rt_tok: Tok = self.__curr_tok
 
             self.__eat()
@@ -264,6 +263,7 @@ class Parser:
         """
         term = (expr)
              | arr_expr
+             | strt_expr
              | fun_expr
              | Numeric
              | Boolean
@@ -290,6 +290,8 @@ class Parser:
             return rt
         elif rt_tok.t == TokT.OP and rt_tok.v == OpT.LBRA:
             return self.__arr_expr()
+        elif rt_tok.t == TokT.OP and rt_tok.v == OpT.LCUR:
+            return self.__strt_expr()
         elif rt_tok.t == TokT.FUN:
             return self.__fun_expr()
         elif rt_tok.t in [TokT.NUM, TokT.BOOL, TokT.STR, TokT.VAR]:
@@ -325,7 +327,53 @@ class Parser:
 
         self.__eat()
 
-        return AST(Tok(TokT.ARR, rt_tok.pos), elem)
+        return AST(Tok(TokT.ARR, pos=rt_tok.pos), elem)
+
+    def __strt_expr(self) -> AST:
+        """
+        strt_expr = {(id : expr (, id : expr)*)?}
+        """
+        rt_tok: Tok = self.__curr_tok
+        elem: List = []
+
+        self.__eat()
+
+        if self.__curr_tok.t != TokT.OP or self.__curr_tok.v != OpT.RCUR:
+            if self.__curr_tok.t != TokT.VAR:
+                raise ParserErr(self.__curr_tok.pos, self.__line, Errno.MEMID_MISS)
+
+            id_tok: Tok = self.__curr_tok
+
+            self.__eat()
+
+            if self.__curr_tok.t != TokT.OP or self.__curr_tok.v != OpT.SEQ:
+                raise ParserErr(self.__curr_tok.pos, self.__line, Errno.INCOMP_EXPR)
+
+            self.__eat()
+            elem.append(AST(Tok(TokT.MEM, id_tok.v, id_tok.pos), [self.__expr()]))
+
+            while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.COM:
+                self.__eat()
+
+                if self.__curr_tok.t != TokT.VAR:
+                    raise ParserErr(self.__curr_tok.pos, self.__line, Errno.MEMID_MISS)
+
+                id_tok: Tok = self.__curr_tok
+
+                self.__eat()
+
+                if self.__curr_tok.t != TokT.OP or self.__curr_tok.v != OpT.SEQ:
+                    raise ParserErr(self.__curr_tok.pos, self.__line, Errno.INCOMP_EXPR)
+
+                self.__eat()
+                elem.append(AST(Tok(TokT.MEM, id_tok.v, id_tok.pos), [self.__expr()]))
+
+        if self.__curr_tok.t != TokT.OP or self.__curr_tok.v != OpT.RCUR:
+            raise ParserErr(rt_tok.pos, self.__line, Errno.NCLOSED_PARN)
+
+        self.__eat()
+
+        return AST(Tok(TokT.STRT, pos=rt_tok.pos), elem)
 
     def __fun_expr(self) -> AST:
         """
@@ -377,7 +425,7 @@ class Parser:
                 raise ParserErr(self.__curr_tok.pos, self.__line, Errno.INCOMP_EXPR)
 
             self.__eat()
-            kwargs.append(AST(Tok(TokT.KWARG, id_tok.v, self.__curr_tok.pos), [self.__expr()]))
+            kwargs.append(AST(Tok(TokT.KWARG, id_tok.v, id_tok.pos), [self.__expr()]))
 
             while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.COM:
                 self.__eat()
@@ -393,7 +441,7 @@ class Parser:
                     raise ParserErr(self.__curr_tok.pos, self.__line, Errno.INCOMP_EXPR)
 
                 self.__eat()
-                kwargs.append(AST(Tok(TokT.KWARG, id_tok.v, self.__curr_tok.pos), [self.__expr()]))
+                kwargs.append(AST(Tok(TokT.KWARG, id_tok.v, id_tok.pos), [self.__expr()]))
 
         if self.__curr_tok.t != TokT.OP or self.__curr_tok.v != OpT.RPAR:
             raise ParserErr(paren_start, self.__line, Errno.NCLOSED_PARN)
