@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, Optional, Dict, Any, Tuple
-from Core.TypeSymbol import TSym
-from Core.Type import TokT
+from .TypeSymbol import *
+from .Type import *
 
 
 @final

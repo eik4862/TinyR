@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, Optional, List, Any
-from Core.Type import TokT, Errno, OpT, T
 from timeit import default_timer as timer
-from Core.AST import AST
-from Class.Array import Arr, Vec, Mat
-from Error.Exception import InterpErr
-from Util.Printer import Printer
-from Core.SymbolTable import SymTab
-from copy import deepcopy
+from .AST import *
+from .SymbolTable import *
+from Class.Array import *
+from Class.Struct import *
+from Error.Exception import *
 
 
 @final
@@ -125,7 +122,10 @@ class Interp:
             ast.tok.v = Arr(elem, [len(ast.ch), *dim_old])
 
     def __interp_strt(self, ast: AST) -> NoReturn:
-        pass
+        for node in ast.ch:
+            self.__interp_hlpr(node)
+
+        ast.tok.v = Strt({node.tok.v[0]: node.tok.v[1] for node in ast.ch}, [node.tok.v[0] for node in ast.ch])
 
     def __interp_hlpr(self, ast: AST) -> NoReturn:
         """
@@ -140,6 +140,11 @@ class Interp:
         # Lookup symbol table and retrieve assigned value.
         if ast.tok.t == TokT.VAR and not ast.lval:
             ast.tok.v = SymTab.inst().lookup_v(ast.tok.v)
+
+        elif ast.tok.t == TokT.MEM:
+            self.__interp_hlpr(ast.ch[0])
+
+            ast.tok.v = (ast.tok.v, ast.ch[0].tok.v)
 
         # OP token with ASGN or EXP is right to left associative.
         # Thus, the rightmost child should be interpreted first.

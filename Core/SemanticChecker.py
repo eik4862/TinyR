@@ -1,14 +1,8 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, List, Optional, Tuple, Any, Dict
-from Core.Type import TokT, Errno, T, OpT
-from timeit import default_timer as timer
-from Core.AST import AST
-from Core.TypeSymbol import TSym, NumTSym, StrTSym, BoolTSym, VoidTSym, FunTSym, ArrTSym, StrtTSym
-from Error.Exception import SemanticChkErr
-from Core.Operator import Arith, Logi, Comp, Sp
-from Core.SymbolTable import SymTab
-from Core.Parser import Parser
+from .Operator import *
+from .Parser import *
+from Error.Exception import *
 
 
 @final
@@ -240,8 +234,7 @@ class SemanticChk:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
         if not (FunTSym(ch_t, ast.tok.v.t.ret) <= ast.tok.v.t):
-            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND,
-                                 infer=str(FunTSym(ch_t, TSym())))
+            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND, infer=str(FunTSym(ch_t, TSym())))
 
         ast.t = ast.tok.v.t.ret
         ast.call = ast.tok.v.call

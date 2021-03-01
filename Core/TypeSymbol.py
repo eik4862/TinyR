@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import final, Optional, List, Dict
-from Core.Type import T
+from .Type import *
 
 
 class TSym:

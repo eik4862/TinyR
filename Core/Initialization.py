@@ -1,12 +1,8 @@
 from __future__ import annotations
 
-import sys
 import signal
-from Util.Printer import Printer
-from Util.Reader import Reader
-from typing import NoReturn, ClassVar, final, TextIO
-from CDLL.CLibrary import CLib
-from Function.MatrixFunction import MatFun
+from Util.Reader import *
+from Function.Matrix import *
 
 
 @final

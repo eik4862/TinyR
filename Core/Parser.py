@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, Optional, List
-from Core.Token import Tok
-from Core.Type import TokT, OpT, Errno
-from timeit import default_timer as timer
-from Core.Lexer import Lexer
-from Core.AST import AST
-from Error.Exception import ParserErr
-from Class.Function import Fun
+from .Lexer import *
+from .AST import *
+from Class.Function import *
+from Error.Exception import *
 
 
 @final

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import final, Callable, List, Tuple
-from Core.TypeSymbol import FunTSym
+from Core.TypeSymbol import *
 
 
 @final

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import NoReturn, ClassVar, final, Optional, List, Final, Set
-from Core.Token import Tok
-from Core.Type import TokT, OpT, Errno
 from timeit import default_timer as timer
-from Error.Exception import ParserErr
-from Core.SymbolTable import SymTab
+from .Token import *
+from .SymbolTable import *
+from Error.Exception import *
 
 
 @final

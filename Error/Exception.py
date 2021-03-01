@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import final, NoReturn, Dict, Any
-from Core.Type import Errno
-from Util.Printer import Printer
+from Core.Type import *
+from Util.Printer import *
 
 
 class Err(Exception):

@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-from typing import final, List, NoReturn, Any, Tuple
-from Error.Exception import FunErr
-from Core.Type import Errno
-from Class.Array import Mat, Vec
-from copy import deepcopy
-from Core.SymbolTable import SymTab
-from Class.Function import Fun
-from Core.TypeSymbol import FunTSym, NumTSym, ArrTSym, BoolTSym
-from CDLL.CLibrary import CLib
+from Class.Array import *
+from Class.Function import *
+from Core.SymbolTable import *
+from Core.TypeSymbol import *
+from CDLL.CLibrary import *
 
 """
 MATRIX FUNCTIONS
@@ -87,19 +83,41 @@ class MatFun:
         SymTab.inst().update_kw(
             'lu',
             Fun(MatFun.lu,
-                FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()], ArrTSym(NumTSym(), 2))
+                FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()],
+                        StrtTSym({'L': ArrTSym(NumTSym(), 2), 'U': ArrTSym(NumTSym(), 2)}))
+                )
+        )
+        SymTab.inst().update_kw(
+            'lu__',
+            Fun(MatFun.lu__,
+                FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()],
+                        StrtTSym({'LU': ArrTSym(NumTSym(), 2), 'p': ArrTSym(NumTSym(), 1), 'q': ArrTSym(NumTSym(), 1),
+                                  'flag': NumTSym()}))
                 )
         )
         SymTab.inst().update_kw(
             'chol',
             Fun(MatFun.chol,
-                FunTSym([ArrTSym(NumTSym(), 2)], ArrTSym(NumTSym(), 2))
+                FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'L': ArrTSym(NumTSym(), 2)}))
+                )
+        )
+        SymTab.inst().update_kw(
+            'chol__',
+            Fun(MatFun.chol__,
+                FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'L': ArrTSym(NumTSym(), 2), 'flag': NumTSym()}))
                 )
         )
         SymTab.inst().update_kw(
             'qr',
             Fun(MatFun.qr,
-                FunTSym([ArrTSym(NumTSym(), 2)], ArrTSym(NumTSym(), 2))
+                FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'Q': ArrTSym(NumTSym(), 2), 'R': ArrTSym(NumTSym(), 2)}))
+                )
+        )
+        SymTab.inst().update_kw(
+            'qr__',
+            Fun(MatFun.qr__,
+                FunTSym([ArrTSym(NumTSym(), 2)],
+                        StrtTSym({'QR': ArrTSym(NumTSym(), 2), 'aux': ArrTSym(NumTSym(), 1), 'flag': NumTSym()}))
                 )
         )
 

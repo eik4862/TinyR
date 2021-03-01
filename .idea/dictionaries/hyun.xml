@@ -5,6 +5,8 @@
       <w>asgn</w>
       <w>cand</w>
       <w>cbind</w>
+      <w>chol</w>
+      <w>cholesky</w>
       <w>cmplx</w>
       <w>componentwise</w>
       <w>dest</w>
@@ -23,9 +25,11 @@
       <w>logi</w>
       <w>lpar</w>
       <w>lval</w>
+      <w>mallocs</w>
       <w>memid</w>
       <w>multithread</w>
       <w>multithreaded</w>
+      <w>multithreading</w>
       <w>mutithreading</w>
       <w>nclosed</w>
       <w>ncol</w>

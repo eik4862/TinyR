@@ -1,14 +1,31 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any, Callable, Tuple, Dict, final, Union, Final
-from operator import add, sub, mul, mod, floordiv, truediv, pow, eq, ne, le, ge, gt, lt, and_, or_, matmul
-from Error.Exception import ArrErr
-from math import ceil, floor
-from Core.Type import Errno
-from copy import deepcopy
-from CDLL.CLibrary import CLib
+from Util.Printer import *
 
 
 @final
-def Strt:
-    pass
+class Strt:
+    def __init__(self, elem: Dict[str, Any], id_: List[str]) -> None:
+        self.__elem: Dict[str, Any] = elem
+        self.__id: List[str] = id_
+
+    def format(self, w: int, h: int, it_w: int, h_remain: bool = False) -> Union[str, Tuple[str, int]]:
+        if len(self.__elem) == 0:
+            return ('Empty struct', 1) if h_remain else 'Empty struct'
+
+        buf: str = ''
+
+        for i in range(len(self.__id)):
+            buf += f'${self.__id[i]}\n'
+
+            it_str, h = Printer.inst().format(self.__elem[self.__id[i]], w, h - 1, it_w, True)
+            buf += it_str + '\n\n'
+            h -= 1
+
+            if h <= 0:
+                buf.rstrip()
+                buf += f'\n... and {len(self.__id) - i - 1} more members in this struct.'
+
+                break
+
+        return (buf.rstrip(), h) if h_remain else buf.rstrip()

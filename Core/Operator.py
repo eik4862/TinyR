@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple, Callable, Any, List, final
-from Core.Type import OpT, T
-from Core.TypeSymbol import TSym, NumTSym, StrTSym, BoolTSym, ArrTSym, VoidTSym
-from Class.Array import Arr, Vec, Mat
-from operator import add, sub, mul, mod, floordiv, truediv, pow, pos, neg, eq, ne, le, ge, gt, lt, and_, or_
+from .TypeSymbol import *
+from Class.Array import *
 
 """
 TYPE CHECKING & ROUTING LOGIC

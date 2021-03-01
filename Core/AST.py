@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import NoReturn, final, List, Callable, Optional
-from Core.Token import Tok
-from Core.TypeSymbol import TSym
+from .Token import *
+from .TypeSymbol import *
 
 
 @final
@@ -34,6 +33,7 @@ class AST:
     """
     BUILT-INS
     """
+
     def __str__(self) -> str:
         return f'AST Node\n  @token type   : {self.__tok.t.name}\n  @token value  : {self.__tok.v}\n' \
                f'  @inferred type: {self.__t}\n  @# of children: {len(self.__ch)}\n  @connection   : {self.__call}\n' \
@@ -44,6 +44,7 @@ class AST:
     """
     GETTERS & SETTERS
     """
+
     @property
     def tok(self) -> Tok:
         return self.__tok

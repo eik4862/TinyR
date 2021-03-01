@@ -1,5 +1,5 @@
-from enum import IntEnum, auto
-from typing import final
+from enum import *
+from typing import *
 
 
 @final

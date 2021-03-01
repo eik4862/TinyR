@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from typing import List, Optional, Any, Callable, Tuple, Dict, final, Union, Final
-from operator import add, sub, mul, mod, floordiv, truediv, pow, eq, ne, le, ge, gt, lt, and_, or_, matmul
-from Error.Exception import ArrErr
-from math import ceil, floor
-from Core.Type import Errno
+from operator import *
 from copy import deepcopy
-from CDLL.CLibrary import CLib
+from math import ceil, floor
+from CDLL.CLibrary import *
+from Error.Exception import *
 
 
 class Arr:
@@ -430,7 +428,7 @@ class Arr:
         if self._dim[-1] == 0:
             buf: str = 'Empty array with dimension ' + ' by '.join(map(str, self._dim))
 
-            return (buf, 1) if h_remain else buf
+            return (buf, h - 1) if h_remain else buf
 
         res, h = self.__format_hlpr(self, [], w, h, it_w)
 
@@ -720,7 +718,7 @@ class Mat(Arr):
         if self._dim[-1] == 0:
             buf: str = f'Empty matrix with dimension {self._dim[0]} by {self._dim[1]}'
 
-            return (buf, 1) if h_remain else buf
+            return (buf, h - 1) if h_remain else buf
 
         buf: str = ''
         c_cnt: int = min(ceil(w / 3), self._dim[1])
@@ -802,7 +800,8 @@ class Mat(Arr):
 
         # Attach the last line indicating # of the omitted elements if needed.
         if resi > 0:
-            buf += f'... and {resi} more elements.'
+            buf.rstrip()
+            buf += f'\n... and {resi} more elements in this matrix.'
             h_use += 1
 
         return (buf.rstrip(), h - h_use) if h_remain else buf.rstrip()
@@ -1099,7 +1098,7 @@ class Vec(Mat):
         :return: Formatted vector.
         """
         if len(self._elem) == 0:
-            return ('Empty vector', 1) if h_remain else 'Empty vector'
+            return ('Empty vector', h - 1) if h_remain else 'Empty vector'
 
         buf: str = ''
         it_cnt: int = min(ceil(w / 3) * h, len(self._elem))
@@ -1147,7 +1146,8 @@ class Vec(Mat):
 
         # Attach the last line indicating # of the omitted elements if needed.
         if resi > 0:
-            buf += f'\n... and {resi} more elements.'
+            buf.rstrip()
+            buf += f'\n... and {resi} more elements in this vector.'
             h_use += 1
 
-        return (buf, h - h_use) if h_remain else buf
+        return (buf.rstrip(), h - h_use) if h_remain else buf.rstrip()

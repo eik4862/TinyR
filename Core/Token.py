@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from typing import NoReturn, final, Any
-from Core.Type import TokT
+from .Type import *
 
 
 @final
@@ -25,6 +24,7 @@ class Tok:
     """
     BUILT-INS
     """
+
     def __str__(self) -> str:
         return f'Token\n  @type : {self.__t.name}\n  @value: {str(self.__v)}\n  @pos  : {self.__pos}'
 
@@ -33,6 +33,7 @@ class Tok:
     """
     GETTERS & SETTERS
     """
+
     @property
     def t(self) -> TokT:
         return self.__t

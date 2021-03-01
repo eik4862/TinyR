@@ -21,7 +21,7 @@ pthread_mutex_t mutex;
 void *__GEMMI(void *arg);
 void *__GEMMF(void *arg);
 void GEMM(const void ** __restrict__ A, const void ** __restrict__ B, void ** __restrict__ C, int l, int m, int n,
-          int blkSz, _Bool int_mat);
+          int blkSz, _Bool intMat);
 
 void __LUPP(double ** __restrict__ A, int * __restrict__ p, int * __restrict__ flag, int m, int n, double tol);
 void __LUCP(double ** __restrict__ A, int * __restrict__ p, int * __restrict__ q, int * __restrict__ flag,
@@ -114,7 +114,7 @@ void *__GEMMF(void *arg) {
 }
 
 void GEMM(const void ** __restrict__ A, const void ** __restrict__ B, void ** __restrict__ C, int l, int m, int n,
-          int blkSz, _Bool int_mat) {
+          int blkSz, _Bool intMat) {
     int lBlk = (l - 1) / blkSz + 1;
     int mBlk = (m - 1) / blkSz + 1;
     int nBlk = (n - 1) / blkSz + 1;
@@ -138,7 +138,7 @@ void GEMM(const void ** __restrict__ A, const void ** __restrict__ B, void ** __
                 data[cnt].blkIdx[2] = k;
                 data[cnt].blkSz = blkSz;
 
-                if (int_mat) {
+                if (intMat) {
                     pthread_create(&threads[cnt], NULL, __GEMMI, &data[cnt]);
                 } else {
                     pthread_create(&threads[cnt], NULL, __GEMMF, &data[cnt]);

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import TextIO, ClassVar, final, Final
+from typing import *
 
 
 @final

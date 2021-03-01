@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from typing import NoReturn, TextIO, ClassVar, final, Final, Any
+from typing import *
 
 
 @final
@@ -48,7 +48,8 @@ class Printer:
     def as_red(cls, line: str) -> str:
         return cls.__RED_BGN + line + cls.__RED_END
 
-    def format(self, obj: Any, w: int = None, h: int = None, it_w: int = None) -> str:
+    def format(self, obj: Any, w: int = None, h: int = None, it_w: int = None, h_remain: bool = False) \
+            -> Union[str, Tuple[str, int]]:
         """
         Format object like R.
         Object whose string expression is too long will be abbreviated using three dots(...).
@@ -73,22 +74,25 @@ class Printer:
         if it_w is None:
             it_w = self.__it_w
 
+        if h <= 0:
+            return ('', h) if h_remain else ''
+
         if type(obj) == bool:
-            return '[1] ' + str(obj)
+            return ('[1] ' + str(obj), h - 1) if h_remain else '[1] ' + str(obj)
         elif type(obj) == int or type(obj) == float:
             v_str: str = str(obj)
 
             if len(v_str) > w:
                 v_str = v_str[:(w - 3)] + '...'
 
-            return '[1] ' + v_str
+            return ('[1] ' + v_str, h - 1) if h_remain else '[1] ' + v_str
         elif type(obj) == str:
             if len(obj) > w - 2:
                 obj = obj[:(w - 5)] + '...'
 
-            return '[1] "' + obj + '"'
+            return ('[1] "' + obj + '"', h - 1) if h_remain else '[1] "' + obj + '"'
         else:
-            return obj.format(w, h, it_w)
+            return obj.format(w, h, it_w, h_remain)
 
     """
     PRINT LOGIC
