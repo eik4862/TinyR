@@ -5,15 +5,18 @@ from ctypes import *
 import Class
 
 
+@final
 class CLib:
     """
     Wrapper class for C DLL(Dynamic-Link Library).
 
-    Some numerical algorithms which entail heavy computation is implemented in C for efficiency.
+    Some numerical algorithms which entail heavy computation are implemented in C for efficiency.
     They are compiled as shared libraries(.so) and will be loaded by this class.
     Since types in Python are not compatible with those in C, we need wrapper functions to transfer data b/w Python & C.
-    CLib class implements those wrappers as class methods.
-    However, the class itself is implemented as an abstract class, thus it can not be (and should not be) instantiated.
+    CLib class implements those wrappers.
+
+    This class is implemented as an abstract class. It can not be (and should not be) instantiated.
+    This class is the end of inheritance. No further inheritance is allowed.
     """
     # Dictionary containing all loaded DLL.
     __LIBC: Dict[str, CDLL] = {}
@@ -43,6 +46,8 @@ class CLib:
 
     """
     TYPE CASTING LOGIC
+    
+    This logic is for internal use only.
     """
 
     @staticmethod
@@ -84,7 +89,7 @@ class CLib:
 
         Parameter t indicates the type of elements of a matrix.
         Unlike Python, C strictly differentiates integer and floating point value.
-        If t is given, it casts all elements in a matrix to the specified type.
+        If t is given, it casts all elements in a matrix to the type specified by t.
         Otherwise, it casts all elements to long in C iff all elements are integer.
         If a matrix contains at least one floating point value, then all elements will be casted to double in C.
         For flag trans, refer to the comments of __C2Mat.
@@ -108,11 +113,18 @@ class CLib:
 
             return (POINTER(t) * m)(*[(t * n)(*[m[i][j] for j in range(n)]) for i in range(m)]), t
 
+    """
+    WRAPPER
+    
+    One can use the following functions as if they are Python functions.
+    However, since they are just wrappers, it does NOT check validity of passed parameters nor raise exceptions.
+    Wrong input parameters may crash the whole program in the worst case.
+    """
+
     @classmethod
     def GEMM(cls, A: Class.Array.Mat, B: Class.Array.Mat, blk_sz: int) -> Class.Array.Mat:
         """
-        General matrix multiplication.
-        Multiplies two matrices A and B.
+        General matrix multiplication. Multiplies two matrices A and B.
 
         For l by m matrix A and m by n matrix B, GEMM costs O(2lmn) FLOPs which grows quite fast.
         Thus GEMM is internally implemented using multithreading.
@@ -225,8 +237,8 @@ class CLib:
         """
         QR decomposition.
 
-        Decomposes full column rank m by n matrix A with m >= n into Q * R where Q is m by m orthogonal matrix st.
-        and R is m by n is upper triangular matrix with positive diagonal entries.
+        Decomposes full column rank m by n matrix A with m >= n into Q * R where Q is m by m orthogonal matrix
+        and R is m by n upper triangular matrix with positive diagonal entries.
         QR costs O(2mn^2 - 2n^3/3) FLOPs and employs Householder transformation.
         Internal implementation of QR computes in-place, that is, it overwrites the input matrix with the elements of
         R and constructing vectors of Householder transformations in a compact form,
@@ -240,7 +252,7 @@ class CLib:
 
         It returns a matrix in which the elements of R and normalized constructing vectors of Householder
         transformations are stored in a compact form, a vector which contains normalizing factors of those constructing
-        vectors, and a flag described above.
+        vectors, and the flag described above.
 
         :param A: Matrix to be QR decomposed.
         :param tol: Tolerance value. If abs(x) < tol, then x will be considered as 0.

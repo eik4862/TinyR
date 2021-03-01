@@ -6,43 +6,36 @@ from math import ceil, floor
 from CDLL.CLibrary import *
 from Error.Exception import *
 
+"""
+CLASSES REPRESENTING ARRAY, MATRIX, AND VECTOR.
+
+Since these three classes are so closely associated, they are implemented in a single source file.
+"""
+
 
 class Arr:
     """
     Array class.
 
-    Represents multidimensional array including vector and matrix.
-    All exceptions raised here will be caught be interpreter and the position in the raw input string
-    where the exception is raised and the raw input string itself will be properly assigned.
+    Represents multidimensional array(tensor).
+    Array can be nested to represent higher dimension: eg. array of matrix, array of array of matrix.
+    But one should not assign vectors or base types as elements of array.
+    Use matrix or vector in those cases.
+
+    All exceptions raised here should be caught by Interp class.
+    Then the erroneous position in the raw input string with the string itself should be properly assigned.
     """
 
     def __init__(self, elem: List, dim: List[int]) -> None:
-        """
-        Constructor of Arr class.
-
-        :param elem: Element of the array.
-        :param dim: Dimension of the array.
-        """
+        # List of elements.
         self._elem: List = elem
+        # Dimension.
         self._dim: List[int] = dim
+        # Counter for iteration. Used by built-ins __next__ and __iter__.
         self._curr: int = 0
 
-    def __next__(self):
-        if self._curr >= len(self._elem):
-            raise StopIteration
-
-        it = self._elem[self._curr]
-        self._curr += 1
-
-        return it
-
-    def __iter__(self):
-        self._curr = 0
-
-        return self
-
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
     """
 
     def __add__(self, other: Any) -> Arr:
@@ -144,10 +137,31 @@ class Arr:
     def __deepcopy__(self, memodict: Dict = {}) -> Arr:
         return Arr(deepcopy(self._elem), self._dim.copy())
 
+    def __next__(self):
+        if self._curr >= len(self._elem):
+            raise StopIteration
+
+        it = self._elem[self._curr]
+        self._curr += 1
+
+        return it
+
+    def __iter__(self):
+        self._curr = 0
+
+        return self
+
     def __str__(self) -> str:
         return 'Arr' + str(self._elem)
 
     __repr__ = __str__
+
+    """
+    INDEXING LOGIC
+    
+    It supports three types of indexing mode: indexing all, indexing by list of indices, and indexing by a single index.
+    
+    """
 
     def get(self, idx: List) -> Any:
         """
@@ -278,10 +292,27 @@ class Arr:
                 return Arr(elem, self._dim.copy())
 
     """
-    PROMOTION LOGIC
+    PROMOTION & DEGRADATION LOGIC
+    
+    Promotion is wrapping an object with additional redundant dimensions.
+    And degradation is stripping those redundant dimensions.
+    
+    Numeric(scala) can be considered as a vector of length 1.
+    Vector of length n can be considered as a matrix of size 1 by n. (Note that we employ row-major policy.)
+    Similarly, m by n matrix can be considered as an array with dimension 1 by m by n.
+    This mathematical concept is supported with help of these promotion & degrading logic.
     """
 
     def promote(self, n: int) -> Arr:
+        """
+        Promotes an array n times.
+
+        Promoting d1 by ... by dp array n times yields 1 by ... by 1 (n of 1s) by d1 by ... by dp array.
+
+        :param n: # of promotions to be applied.
+
+        :return: Promoted array.
+        """
         res: Arr = self
 
         while n > 0:
@@ -291,6 +322,17 @@ class Arr:
         return res
 
     def degrade(self, n: int) -> Any:
+        """
+        Degrades an array n times.
+
+        Degrading 1 by ... by 1 (m of 1s) by ... array. n(<=m) times yields 1 by ... by 1 (m - n of 1s) by ... array.
+        Note that when the # of dimensions becomes less than 3, it returns a matrix or vector, not array.
+        Also, it does NOT check whether the dimension to be stripped is actually redundant or not.
+
+        :param n: # of degradations to be applied.
+
+        :return: Degraded array.
+        """
         res: Arr = self
 
         while n > 0:
@@ -303,28 +345,64 @@ class Arr:
         return res
 
     """
-    ITERATION LOGIC
+    APPLICATION LOGIC
+    
+    The spirit of array, matrix, and vector operations is supported by these logic.
+    As its name implies, it applies the given operation componentwisely or distributively.
+    
+    Application rules for binary operator op are as follows:
+        1. [a1, ..., ap] op [b1, ..., bp] => [a1 op b1, ..., ap op bp].           [BinOpComp]
+        2. [a1, ..., ap] op b => [a1 op b, ..., ap op b] if b is of 'unit' of op. [BinOpDist]
+    Rules are applied following the order as above.
+    Here, 'unit' is the smallest type st. the operation is defined.
+    For most binary operators, unit is numeric. However, matrix multiplication has matrix as its unit.
+        
+    Application rule for unary operator op is as follows:
+        1. op [a1, ..., ap] => [op a1, ..., op ap]. [UniOpComp]
+        
+    Since rule [UniOpComp] is relatively simple, [UniOpComp] is directly implemented in built-in overriding above.
+    Rules for binary operators, however, are implemented here separately.
+    
+    Subclasses also override this application logic.
+    Considering the overriding of application logic and built-ins, we can roughly draw following case-by-case scenarios.
+        a op a    [*]    Vec op a    [Vec]  Mat op a    [Mat]  Arr op a    [Arr]
+        a op Vec  [Vec]  Vec op Vec  [Vec]  Mat op Vec  [Mat]  Arr op Vec  [Arr]
+        a op Mat  [Mat]  Vec op Mat  [Mat]  Mat op Mat  [Mat]  Arr op Mat  [Arr]
+        a op Arr  [Arr]  Vec op Arr  [Arr]  Mat op Arr  [Arr]  Arr op Arr  [Arr]
+    Here, a stands for an object of base type like numeric and the class in bracket indicates the class responsible for
+    handling the corresponding case.
+    Note that a op a cannot be handled by any of classes in this module, thus it should be handled somewhere else.
+    Class Op will do this.
+    
+    This logic is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Arr:
         """
-        Applies general binary operation to the array properly.
-        There are three (basically two) cases.
-            1. [a1, ..., ap] op [b1, ..., bp] => [a1 op b1, ..., ap op bp]
-            2. [a1, ..., ap] op b => [a1 op b, ..., ap op b] if b is base type.
-            3. a op [b1, ..., bp] => [a op b1, ..., a op bp] if a is base type.
-        The first case is componentwise case and the others are distributive case.
-        Self will be considered as LHS and other will be considered as RHS.
-        This should be took into consideration for some operations, like rmul.
-        Dimension of one hand side may be automatically promoted for case 1.
+        Applies binary operator op.
 
-        :param other: Right hand side of the operation.
-        :param op: Operation to be applied.
+        Parameter self and other are considered as LHS and RHS, resp.
+        Following cases are to be handled.
+            1. a op Arr   => Arr rop a
+            2. Vec op Arr => Arr rop Vec
+            3. Mat op Arr => Arr rop Mat
+            4. Arr op a
+            5. Arr op Vec
+            6. Arr op Mat
+            7. Arr op Arr
+        For case 1 through 3, self is actually RHS and other is LHS.
+        However, this does NOT matter since those cases call this function with rop instead of op.
+        (rop is 'reversed' version of op: x rsub y is y - x)
+        Thus the first three cases reduce to case 4, 5, and 6, resp.
+        For case 4, rule [BinOpDist] will be applied and for case 5 and 6, rule [BinOpComp] will be applied
+        with promotion, if needed.
 
-        :return: Operation result.
+        :param other: RHS.
+        :param op: Operator to be applied.
 
-        :raise ArrErr: In componentwise case, two arrays whose dimensions are not compatible raise exception
-                       with errno DIM_MISMATCH.
+        :return: Result.
+
+        :raise ArrErr[DIM_MISMATCH]: If # of elements does not match during applying rule [BinOpComp].
         """
         if isinstance(other, Arr):
             if self.dept > other.dept:
@@ -342,17 +420,19 @@ class Arr:
 
     def __apply_matmul(self, other: Any, op: Callable) -> Arr:
         """
-        Applies matrix multiplication to the array properly.
-        Matrix operation deserves a special treat, and thus it is written as a separated logic.
-        Logical structure is exactly same as __apply.
+        Applies matrix multiplication operator op.
 
-        :param other: Right hand side of the operation.
-        :param op: Operation to be applied.
+        Since matrix multiplication has matrix as its unit, application logic for it needs a special treat.
+        Unlike Arr.__apply, rule [BinOpDist] will be applied to case 4 through 6
+        and rule [BinOpComp] will be applied to case 7.
+        Other logical structure is the same as Arr.__apply.
 
-        :return: Operation result.
+        :param other: RHS.
+        :param op: Matrix multiplication operator. Must be one of matmul or rmatmul(lambda expr).
 
-        :raise ArrErr: In componentwise case, two arrays whose dimensions are not compatible raise exception
-                  with errno DIM_MISMATCH.
+        :return: Result.
+
+        :raise ArrErr[DIM_MISMATCH]: If # of elements does not match during applying rule [BinOpComp].
         """
 
         if type(other) == Arr:
@@ -445,7 +525,7 @@ class Arr:
         return self
 
     """
-    GETTERS & SETTERS
+    GETTER & SETTER
     """
 
     @property
@@ -462,18 +542,26 @@ class Arr:
 
 
 class Mat(Arr):
+    """
+    Matrix class.
+
+    Represents matrix.
+    Matrix should contain vectors as its elements.
+    One should not assign base types as elements or matrix.
+    Use vector in that case.
+
+    All exceptions raised here should be caught by Interp class.
+    Then the erroneous position in the raw input string with the string itself should be properly assigned.
+    """
+    # Block size for parallel matrix multiplication.
+    # Refer to the comments of CLib.GEMM.
     __BLK_SZ: Final[int] = 500
 
     def __init__(self, elem: List, dim: List[int]) -> None:
-        """
-        Constructor of Arr class.
-
-        :param elem: Element of the matrix.
-        """
         super().__init__(elem, dim)
 
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
     """
 
     def __add__(self, other: Any) -> Mat:
@@ -665,7 +753,9 @@ class Mat(Arr):
                 return Mat(elem, self._dim.copy())
 
     """
-    PROMOTION LOGIC
+    PROMOTION & DEGRADATION LOGIC
+
+    Refer to the comments of Arr class.
     """
 
     def promote(self, n: int) -> Arr:
@@ -675,7 +765,10 @@ class Mat(Arr):
         return self._elem[0].degrade(n - 1) if n > 0 else self
 
     """
-    ITERATION LOGIC
+    APPLICATION LOGIC
+
+    Refer to the comments of Arr class.
+    This logic is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Mat:
@@ -853,16 +946,22 @@ class Mat(Arr):
 
 @final
 class Vec(Mat):
-    def __init__(self, elem: List) -> None:
-        """
-        Constructor of Arr class.
+    """
+    Vector class.
 
-        :param elem: Element of the vector.
-        """
+    Represents vector.
+    Vector should contain base types as its elements.
+
+    All exceptions raised here should be caught by Interp class.
+    Then the erroneous position in the raw input string with the string itself should be properly assigned.
+
+    This class is the end of inheritance. No further inheritance is allowed.
+    """
+    def __init__(self, elem: List) -> None:
         super().__init__(elem, [len(elem)])
 
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
     """
 
     def __add__(self, other: Any) -> Vec:
@@ -1051,7 +1150,9 @@ class Vec(Mat):
                 return Vec(elem)
 
     """
-    PROMOTION LOGIC
+    PROMOTION & DEGRADATION LOGIC
+
+    Refer to the comments of Arr class.
     """
 
     def promote(self, n: int) -> Arr:
@@ -1064,7 +1165,10 @@ class Vec(Mat):
             return self
 
     """
-    ITERATION LOGIC
+    APPLICATION LOGIC
+
+    Refer to the comments of Arr class.
+    This logic is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Vec:
