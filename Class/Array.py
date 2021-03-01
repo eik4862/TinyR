@@ -210,6 +210,7 @@ class Arr:
         :return: Indexed elements.
 
         :raise ArrErr[EMPTY_IDX]: If index list is empty.
+        :raise ArrErr[IDX_BOUND]: If index is out of bound.
         """
         if len(idx) > self.dept:
             return self.promote(len(idx) - self.dept).get(idx)
@@ -282,21 +283,21 @@ class Arr:
 
     def update(self, idx: List, val: Any) -> Any:
         """
-        Update elements indicated by idx to val.
+        Updates elements indicated by idx to val.
 
         Naive implementation of all ten rules is trivial but very laborious.
-        As in Vec.get, it delegates the implementation of base cases to Vec class.
+        As in Arr.get, it delegates the implementation of base cases to Vec class.
         Here, other five rules are implemented.
 
         Promotion of self may be needed if the length of index chain exceeds the depth of an array.
         Promotion of val may be needed if distributive rules are applied and
         the depth of indexing result exceeds the depth of val.
-        Unlike the promotion of self, that of val is one is tricky since it needs information on the indexing result.
+        Unlike the promotion of self, that of val is tricky since it needs information on the indexing result.
         Fortunately, the depth of indexing result can be inferred by semantic checker 'before' interpretation.
         Since such information is invisible here, promotion of val will be handled outside of this module.
         It just assumes that val is already promoted properly.
         Like Arr.get, updating base type by indexing it is another tricky problem.
-        This will be handled outside of this module. Class Interp will do this.
+        This will be also handled outside of this module. Class Interp will do this.
 
         Float can be used as an index, and it will be rounded.
         However, this may cause unexpected behaviors due to rounding.
@@ -305,6 +306,11 @@ class Arr:
         :param val: Value to be assigned.
 
         :return: Updated array.
+
+        :raise ArrErr[EMPTY_IDX]: If index list is empty.
+        :raise ArrErr[IDX_BOUND]: If index is out of bound.
+        :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
+                                    distributive case.
         """
         if len(idx) > self.dept:
             return self.promote(len(idx) - self.dept).update(idx, val)
@@ -323,6 +329,7 @@ class Arr:
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
+                # TODO: Empty index?
                 if len(idx_set) != len(val):
                     raise ArrErr(Errno.ASGN_N_MISS, need=len(idx_set), given=len(val))
 
@@ -544,25 +551,22 @@ class Arr:
 
     """
     FORMATTING LOGIC
+    
+    Cumbersome logic which enables to print out array 'prettily'.
     """
 
+    # TODO: Exceeding case?
     @staticmethod
     def __format_hlpr(elem: Arr, pos: List[int], w: int, h: int, it_w: int) -> Tuple[str, int]:
         """
-        Formats array(with depth > 2) properly.
-        It recursively visits elements until it encounters matrix.
-        Then each matrix will be formatted until the given height is exhausted.
-        Each matrix element will be separated by newline and
-        will be preceded by index indicating the position of the matrix in the original array.
-        Empty array will be formatted as 'Empty array with dimension d1 by ... by dp'.
+        For
 
-        :param pos: Position of currently visiting element in the original array.
-        :param w: Width of the output.
-        :param h: Height of the output.
-        :param it_w: Maximum width of the element in the array.
-        :param dept: Depth of current visiting. Used to determine it is time to format matrix or request further visit.
-
-        :return: Tuple consists of formatted array and # of lines used.
+        :param elem:
+        :param pos:
+        :param w:
+        :param h:
+        :param it_w:
+        :return:
         """
         if h <= 0:
             return '', h
@@ -784,7 +788,7 @@ class Mat(Arr):
 
     def update(self, idx: List, val: Any) -> Any:
         """
-        Update elements indicated by idx to val.
+        Updates elements indicated by idx to val.
 
         For details, refer to the comments of Arr.update.
         Note that Mat class cannot just inherit update method from Arr class because the return types are different.
@@ -793,6 +797,11 @@ class Mat(Arr):
         :param val: Value to be assigned.
 
         :return: Updated matrix.
+
+        :raise ArrErr[EMPTY_IDX]: If index list is empty.
+        :raise ArrErr[IDX_BOUND]: If index is out of bound.
+        :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
+                                    distributive case.
         """
         if len(idx) > 2:
             return self.promote(len(idx) - 1).update(idx, val)
@@ -1238,16 +1247,34 @@ class Vec(Mat):
     """
 
     def update(self, idx: List, val: Any) -> Any:
+        """
+        Updates elements indicated by idx to val.
+
+        Here, base cases of updating rules are implemented.
+        For details, refer to the comments of Arr.update.
+
+        :param idx: Index chain.
+        :param val: Value to be assigned.
+
+        :return: Updated matrix.
+
+        :raise ArrErr[EMPTY_IDX]: If index list is empty.
+        :raise ArrErr[IDX_BOUND]: If index is out of bound.
+        :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
+                                    distributive case.
+        """
         if len(idx) > 1:
             return self.promote(len(idx) - 1).update(idx, val)
 
         if type(val) == Vec:
             if idx[0] is None:
+                # [UpIdxAllCompBase]
                 if self._dim[0] != val._dim[0]:
                     raise ArrErr(Errno.ASGN_N_MISS, need=self._dim[0], given=val._dim[0])
 
                 return Vec(deepcopy(val._elem))
             else:
+                # [UpIdxListCompBase]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -1265,8 +1292,10 @@ class Vec(Mat):
                 return Vec(elem)
         else:
             if idx[0] is None:
+                # [UpIdxAllDistBase]
                 return Vec([deepcopy(val) for _ in range(self._dim[0])])
             elif type(idx[0]) == Vec:
+                # [UpIdxListDistBase]
                 idx_set: Vec = idx[0]
                 elem: List = deepcopy(self._elem)
 
@@ -1280,6 +1309,7 @@ class Vec(Mat):
 
                 return Vec(elem)
             else:
+                # [UpIdxSnglBase]
                 i: int = round(idx[0])
                 elem: List = deepcopy(self._elem)
 
@@ -1331,27 +1361,49 @@ class Vec(Mat):
 
     def format(self, w: int, h: int, it_w: int, h_remain: bool = False) -> Union[str, Tuple[str, int]]:
         """
-        Formats vector properly.
-        Each line starts with the index of the first element in that line.
+        Formats vector.
+
+        It builds up a formatted string of a vector so that it 'roughly' fits in the given width w and height h.
+        The point here is that it 'roughly' fits, NOT exactly fits.
+        Formatting vector so that it exactly fits in requires more complicated logic including backtracking technique.
+        Elements whose string expression exceeds the limit it_w will be abbreviated.
+        For abbreviation and basic formatting policies, refer to the comments of Printer.format.
+
+        Each line starts with the index of the first element presented in that line.
+        Then consecutive elements follows until the given width is reached.
+        If there are too many elements in a vector so that some of them cannot be formatted,
+        a line presenting # of omitted elemets will be attached at the end.
         Empty vector will be formatted as 'Empty vector'.
+
+        The rough flow of the logic is as follows:
+            1. Stringfy 'enough' number of elements in a vector.
+            2. Determine the exact # of elements to be printed out.
+            3. Build up the resultant string.
+            4. Attaches the last line indicating # of omitted elements if needed.
 
         :param w: Width of the output.
         :param h: Height of the output.
-        :param it_w: Maximum width of the element in the vector.
+        :param it_w: Maximum width of an element.
         :param h_remain: If true, it returns # of used lines. (Default: False)
 
-        :return: Formatted vector.
+        :return: Formatted string.
         """
         if len(self._elem) == 0:
             return ('Empty vector', h - 1) if h_remain else 'Empty vector'
 
+        # [Step 1]
         buf: str = ''
-        it_cnt: int = min(ceil(w / 3) * h, len(self._elem))
+        # Suppose all elements have string expression with length 1.
+        # Since there should be (at least) 2 spaces b/w elements, each elements will eat up 3 spaces.
+        # Then at most ceil(w / 3) elements can be formatted in a single line.
+        # Thus # of elements which will be actually formatted cannot exceed ceil(w / 3) * h.
+        it_cnt: int = min(ceil(w / 3) * h, self._dim[0])
         pool: List[Optional[str]] = [None] * it_cnt
         qt: bool = (type(self._elem[0]) == str)
+        # In case of string elements, we need double quote(") enclosing each of them.
+        # This can be considered as it_w being reduced by 2.
         it_w, max_it_w = 0, it_w - 2 * qt
 
-        # Stringfy 'enough' elements.
         for i in range(it_cnt):
             it_str: str = str(self._elem[i])
 
@@ -1361,13 +1413,20 @@ class Vec(Mat):
             it_w = max(it_w, len(it_str))
             pool[i] = it_str
 
-        # Determine exact # of elements which can be formatted.
+        # [Step 2]
+        # Now it_w is exactly the largest (after abbreviation) width of elements which can be formatted.
+        # Then each element eats up exactly it_w + 2 spaces and exactly floor(w / (it_w + 2)) of elements can be
+        # formatted in a single line.
         n: int = floor(w / (it_w + 2))
-        m: int = min(ceil(it_cnt / n), h)
-        idx_w: int = len(str(1 + n * (m - 1))) + 2
+        # Given n, it needs exactly ceil(self._dim[0] / n) lines to format all elements.
+        m: int = min(ceil(self._dim[0] / n), h)
+        # Given m, index preceding each line will be 0, n, ..., n * (m - 1).
+        # The largest width among them is achieved by the last one and
+        # note that there should be bracket [ and ] enclosing those indices.
+        idx_w: int = len(str(n * (m - 1))) + 2
         i: int = 0
 
-        # Format each element.
+        # [Step 3]
         while i < m - 1:
             buf += ('[' + str(i * n) + ']').rjust(idx_w)
             j: int = 0
@@ -1389,7 +1448,7 @@ class Vec(Mat):
         resi: int = self._dim[0] - (m - 1) * n - min(n, self._dim[0] - (m - 1) * n)
         h_use: int = m
 
-        # Attach the last line indicating # of the omitted elements if needed.
+        # [Step 4]
         if resi > 0:
             buf.rstrip()
             buf += f'\n... and {resi} more elements in this vector.'

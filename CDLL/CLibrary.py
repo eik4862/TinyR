@@ -193,7 +193,7 @@ class CLib:
         q: Array = (c_int * n)(*[i for i in range(n)]) if cp else None
         flag = POINTER(c_int)(c_int())
 
-        cls.__LIBC['MatOp'].GECP(A, p, q, flag, m, n, c_double(tol))
+        cls.__LIBC['MatOp'].LU(A, p, q, flag, m, n, c_double(tol))
 
         if cp:
             return cls.__C2Mat(A, [m, n]), cls.__C2Vec(p, m), cls.__C2Vec(q, n), flag.contents.value
