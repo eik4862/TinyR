@@ -7,42 +7,42 @@ from .TypeSymbol import *
 @final
 class AST:
     """
-    Abstract Syntax Tree class for interpretation.
+    AST(Abstract Syntax Tree) class.
+
+    Represents node in AST.
+    For simplicity, there is no differentiation b/w terminal and internal nodes.
+
+    This class is the end of inheritance. No further inheritance is allowed.
     """
 
     def __init__(self, tok: Tok, ch: List[AST] = None, t: TSym = None, call: Optional[Callable] = None,
                  lval: bool = False) -> None:
-        """
-        Constructor of AST class.
-
-        Generally, tok and ch will be given at its first construction.
-        Then semantic checker will fill in other fields.
-
-        :param tok: Token which corresponds to this node.
-        :param ch: Pointer to the child AST nodes. (Default: [])
-        :param t: Inferred type of this node. (Default: None)
-        :param call: Pointer to the function which will be called during interpretation. (Default: None)
-        :param lval: Flag indicating l-value for assignment. (Default: False)
-        """
+        # Corresponding token.
         self.__tok: Tok = tok
+        # List of children.
         self.__ch: List[AST] = ch if ch is not None else []
+        # Following three fields will be assigned by semantic checker. Refer to the comments of SemanticChk class.
+        # Inferred type.
         self.__t: TSym = t
+        # Function pointer which is to be called for interpretation.
+        # This field is only used by nodes with function token or operator token.
         self.__call: Optional[Callable] = call
+        # Flag indicating whether the node is l-value or not.
         self.__lval: bool = lval
 
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
     """
 
     def __str__(self) -> str:
-        return f'AST Node\n  @token type   : {self.__tok.t.name}\n  @token value  : {self.__tok.v}\n' \
+        return f'AST Node\n  @token type   : {self.__tok.t.name}\n  @token value  : {str(self.__tok.v)}\n' \
                f'  @inferred type: {self.__t}\n  @# of children: {len(self.__ch)}\n  @connection   : {self.__call}\n' \
                f'  @l-value      : {self.__lval}'
 
     __repr__ = __str__
 
     """
-    GETTERS & SETTERS
+    GETTER & SETTER
     """
 
     @property

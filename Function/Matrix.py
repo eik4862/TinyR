@@ -87,39 +87,39 @@ class MatFun:
                         StrtTSym({'L': ArrTSym(NumTSym(), 2), 'U': ArrTSym(NumTSym(), 2)}))
                 )
         )
-        SymTab.inst().update_kw(
-            'lu__',
-            Fun(MatFun.lu__,
-                FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()],
-                        StrtTSym({'LU': ArrTSym(NumTSym(), 2), 'p': ArrTSym(NumTSym(), 1), 'q': ArrTSym(NumTSym(), 1),
-                                  'flag': NumTSym()}))
-                )
-        )
+        # SymTab.inst().update_kw(
+        #     'lu__',
+        #     Fun(MatFun.lu__,
+        #         FunTSym([ArrTSym(NumTSym(), 2), BoolTSym()],
+        #                 StrtTSym({'LU': ArrTSym(NumTSym(), 2), 'p': ArrTSym(NumTSym(), 1), 'q': ArrTSym(NumTSym(), 1),
+        #                           'flag': NumTSym()}))
+        #         )
+        # )
         SymTab.inst().update_kw(
             'chol',
             Fun(MatFun.chol,
                 FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'L': ArrTSym(NumTSym(), 2)}))
                 )
         )
-        SymTab.inst().update_kw(
-            'chol__',
-            Fun(MatFun.chol__,
-                FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'L': ArrTSym(NumTSym(), 2), 'flag': NumTSym()}))
-                )
-        )
+        # SymTab.inst().update_kw(
+        #     'chol__',
+        #     Fun(MatFun.chol__,
+        #         FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'L': ArrTSym(NumTSym(), 2), 'flag': NumTSym()}))
+        #         )
+        # )
         SymTab.inst().update_kw(
             'qr',
             Fun(MatFun.qr,
                 FunTSym([ArrTSym(NumTSym(), 2)], StrtTSym({'Q': ArrTSym(NumTSym(), 2), 'R': ArrTSym(NumTSym(), 2)}))
                 )
         )
-        SymTab.inst().update_kw(
-            'qr__',
-            Fun(MatFun.qr__,
-                FunTSym([ArrTSym(NumTSym(), 2)],
-                        StrtTSym({'QR': ArrTSym(NumTSym(), 2), 'aux': ArrTSym(NumTSym(), 1), 'flag': NumTSym()}))
-                )
-        )
+        # SymTab.inst().update_kw(
+        #     'qr__',
+        #     Fun(MatFun.qr__,
+        #         FunTSym([ArrTSym(NumTSym(), 2)],
+        #                 StrtTSym({'QR': ArrTSym(NumTSym(), 2), 'aux': ArrTSym(NumTSym(), 1), 'flag': NumTSym()}))
+        #         )
+        # )
 
     @staticmethod
     def o_mat(n: int) -> Mat:

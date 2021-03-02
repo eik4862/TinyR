@@ -2,35 +2,59 @@ from __future__ import annotations
 
 from .Type import *
 
+"""
+CLASSES REPRESENTING TYPES.
+
+There are two category of types: base type and composite type.
+Only numeric, boolean, string, and void are base types.
+Other types, array, struct, and function, are all composite types.
+Composite types are represented by using base types and some additional information.
+
+Actually, module Type defines one more type, NA.
+However, NA type must be used temporarily, like placeholder.
+Most operations and functions on types implicitly assume that there is no NA type.
+"""
+
 
 class TSym:
     """
-    Type symbol class for static type checking.
+    Root class for type symbols.
+
+    For most cases, this class should not be instantiated.
+    Instead, use this class as a wild card meaning 'any type symbol'.
+    Nevertheless, there are some special occasions where instance of this class is quite useful.
+    In such occasions, extra care must be taken since the instance has NA type, unless specified.
     """
 
     def __init__(self, t: T = T.NA) -> None:
-        """
-        Constructor of AST class.
-
-        There are two category in type, base and composite.
-        Numeric, boolean, string and void are base types. All others are composite types.
-        There are one special but temporary type, called NA type. NA type is type variable in type inference.
-        After all type checking, NA types should be substituted properly.
-        """
+        # Symbol type. Subclasses which are used in most cases automatically fills in this field properly.
         self.__t: T = t
+        # Flag indicating whether the symbol is base type or not.
         self.__base: bool = t in [T.NUM, T.BOOL, T.STR, T.VOID]
 
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
+    """
+
+    def __str__(self) -> str:
+        return 'NA'
+
+    __repr__ = __str__
+
+    """
+    OPERATIONS
     """
 
     def __eq__(self, other: TSym) -> bool:
         """
-        Num == Num
-        Str == Str
-        Bool == Bool
-        Void == Void
-        Arr[a, m] == Arr[b, n] if a == b and m == n
+        Determines whether two types are equal or not.
+
+        Rules determining an equality of two types are as follows:
+            1. a == b if a and b are the same base type.                                               [EqBase]
+            2. Arr[a, m] == Arr[b, n] if a == b and m = n.                                             [EqArr]
+            3. ((a1, ..., ap) => b) == ((c1, ..., cq) => d) if ai == ci for all i, b == d, and p = q.  [EqFun]
+            4. Two struct types a and b are equal iff they have the same ids
+               and for any id, type of a[id] and that of b[id] are equal.                              [EqStrt]
 
         NA type should not be compared.
         """
@@ -38,25 +62,31 @@ class TSym:
             return False
 
         if self.__base and other.__base and self.__t == other.__t:
+            # [EqBase]
             return True
         elif self.__t == T.ARR:
+            # [EqArr]
             return self.elem.__t == other.elem.__t and self.dept == other.dept
         elif self.__t == T.FUN:
+            # [EqFun]
             return self.args == other.args and self.ret == other.ret
         elif self.__t == T.STRT:
+            # [EqStrt]
             return self.elem == other.elem
 
         return False
 
     def __le__(self, other: TSym) -> bool:
         """
-        This overriding represents subtype system.
+        Determines whether type a is a subtype of type b or not.
 
-        a <: b if a == b
-        Void <: Any type
-        Bool <: Num
-        a <: Arr[b, n] if a <: b and a is base type
-        Arr[a, m] <: Arr[b, n] if a <: b and m <= n
+        Rules determining subtype relation are as follows:
+            1. a <: b if a == b.  [SubEq]
+            2. Void <: a for any type a.  [SubVoid]
+            3. Bool <: Num.  [SubBool]
+            4. a <: Arr[b, n] if a <: b and a is base type.  [SubArr1]
+            5. Arr[a, n] <: Arr[b, m] if a <: b and n <= m.  [SubArr2]
+            6.
 
         NA type should not be compared.
         """
@@ -92,15 +122,6 @@ class TSym:
             return True
 
         return False
-
-    def __str__(self) -> str:
-        return 'Unknown'
-
-    __repr__ = __str__
-
-    """
-    OPERATIONS
-    """
 
     @staticmethod
     def sup(*set_: TSym) -> Optional[TSym]:

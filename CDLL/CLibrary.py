@@ -124,7 +124,7 @@ class CLib:
     @classmethod
     def GEMM(cls, A: Class.Array.Mat, B: Class.Array.Mat, blk_sz: int) -> Class.Array.Mat:
         """
-        General matrix multiplication. Multiplies two matrices A and B.
+        General matrix multiplication.
 
         For l by m matrix A and m by n matrix B, GEMM costs O(2lmn) FLOPs which grows quite fast.
         Thus GEMM is internally implemented using multithreading.

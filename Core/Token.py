@@ -6,23 +6,22 @@ from .Type import *
 @final
 class Tok:
     """
-    Token class for parsing.
+    Token class.
     """
 
     def __init__(self, t: TokT, v: Any = None, pos: int = -1) -> None:
-        """
-        Constructor of Tok class.
-
-        :param t: Type of the token.
-        :param v: Value of the token. (Default: None)
-        :param pos: Position in the raw input where the token is derived. (Default: -1)
-        """
+        # Token type.
         self.__t: TokT = t
+        # Token value.
+        # For array token and struct token, this field will be assigned latter by interpreter.
+        # For void token and EOF token, this field will be never assigned.
+        # For other tokens, this field will be assigned at the time of instantiation by lexer.
         self.__v: Any = v
+        # Position in the raw input string where the token is derived.
         self.__pos: int = pos
 
     """
-    BUILT-INS
+    BUILT-IN OVERRIDING
     """
 
     def __str__(self) -> str:
@@ -31,7 +30,7 @@ class Tok:
     __repr__ = __str__
 
     """
-    GETTERS & SETTERS
+    GETTER & SETTER
     """
 
     @property

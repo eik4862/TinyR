@@ -122,6 +122,8 @@ class Arr:
     def __ror__(self, other: Any) -> Arr:
         return self.__or__(other)
 
+    # Invert operator will act as a boolean negation, which is NOT its original functionality.
+    # Since Python does not allow the overriding of keyword 'not', we use __invert__ as a detour.
     def __invert__(self) -> Arr:
         return Arr([~it for it in self._elem], self._dim.copy())
 
@@ -168,7 +170,7 @@ class Arr:
     and thus there is no dimension drop.
     The last one, however, does have a dimension drop since it extracts a single element.
     
-    Further, indexing can be chained. That is, a[i1, ..., ip] is allowed means:
+    Further, indexing can be chained. That is, a[i1, ..., ip] is allowed and means:
     First, index from a using i1. Then index from each of previously indexed items using i2, and so on.
         
     Summarizing, we define index chain and indexing rule as follows:
@@ -310,7 +312,7 @@ class Arr:
         :raise ArrErr[EMPTY_IDX]: If index list is empty.
         :raise ArrErr[IDX_BOUND]: If index is out of bound.
         :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
-                                    distributive case.
+                                    componentwise case.
         """
         if len(idx) > self.dept:
             return self.promote(len(idx) - self.dept).update(idx, val)
@@ -461,7 +463,7 @@ class Arr:
         a op Vec  [Vec]  Vec op Vec  [Vec]  Mat op Vec  [Mat]  Arr op Vec  [Arr]
         a op Mat  [Mat]  Vec op Mat  [Mat]  Mat op Mat  [Mat]  Arr op Mat  [Arr]
         a op Arr  [Arr]  Vec op Arr  [Arr]  Mat op Arr  [Arr]  Arr op Arr  [Arr]
-    Here, a stands for an object of base type like numeric and the class in bracket indicates the class responsible for
+    Here, a stands for base type like numeric and the class in bracket indicates the class responsible for
     handling the corresponding case.
     Note that a op a cannot be handled by any of classes in this module, thus it should be handled somewhere else.
     Class Op will do this.
@@ -552,22 +554,12 @@ class Arr:
     """
     FORMATTING LOGIC
     
-    Cumbersome logic which enables to print out array 'prettily'.
+    Cumbersome logic to print array (and its subclasses) prettily.
     """
 
     # TODO: Exceeding case?
     @staticmethod
     def __format_hlpr(elem: Arr, pos: List[int], w: int, h: int, it_w: int) -> Tuple[str, int]:
-        """
-        For
-
-        :param elem:
-        :param pos:
-        :param w:
-        :param h:
-        :param it_w:
-        :return:
-        """
         if h <= 0:
             return '', h
 
@@ -585,19 +577,8 @@ class Arr:
 
             return buf, h
 
+    # TODO: Exceeding case?
     def format(self, w: int, h: int, it_w: int, h_remain: bool = False) -> Union[str, Tuple[str, int]]:
-        """
-        Formats array(including vector and matrix) like R.
-        Element which is too long will be abbreviated using three dots(...).
-        String element will be enclosed by double quote(").
-        If there are too many elements to be formatted, the last line shows # of the left elements.
-
-        :param w: Width of the output.
-        :param h: Height of the output.
-        :param it_w: Maximum width of the element in the array.
-
-        :return: Formatted array.
-        """
         if self._dim[-1] == 0:
             buf: str = 'Empty array with dimension ' + ' by '.join(map(str, self._dim))
 
@@ -607,7 +588,27 @@ class Arr:
 
         return (res.rstrip(), h) if h_remain else res.rstrip()
 
+    """
+    UTIL
+    """
+
+    # TODO: Need update?
     def append(self, v: Any) -> Arr:
+        """
+        Appends v as an element.
+
+        Two types of appending are supported.
+        One is appending a single object, and the other is appending multiple objects.
+        In case of appending multiple objects, v should be a list (NOT vector) of objects to be appended.
+
+        Note that this function does NOT check the validity of v.
+        Wrongly passed v can corrupt the whole structure of the original array (or its subclasses).
+        The user must use this function with extra care.
+
+        :param v: Object or list of objects to be appended.
+
+        :return: Array (or its subclasses) after appending.
+        """
         if type(v) == list:
             self._elem += v
             self._dim[0] += len(v)
@@ -676,6 +677,23 @@ class Mat(Arr):
         return self.__mul__(other)
 
     def __matmul__(self, other: Any) -> Mat:
+        """
+        Multiplies two matrices.
+
+        There are following cases where this function is being called:
+            1. Mat %*% a where a is base type.
+            2. Mat %*% Vec.
+            3. Mat %*% Mat.
+        For case 1 and 2, matrix multiplication is valid iff self has only one column.
+        For case 3, matrix multiplication is valid iff # of columns in self and # of rows in other are equal.
+        Call of this function with array as other should be rejected.
+
+        :param other: RHS.
+
+        :return: self %*% other.
+
+        :raise ArrErr[DIM_MISMATCH]: If dimensions of two matrices are not compatible for matrix multiplication.
+        """
         if type(other) == Arr:
             return NotImplemented
 
@@ -696,6 +714,22 @@ class Mat(Arr):
             return Mat([it * other for it in self._elem], [self._dim[0], 1])
 
     def __rmatmul__(self, other: Any) -> Mat:
+        """
+        Multiplies two matrices.
+
+        There are following cases where this function is being called:
+            1. a %*% Mat where a is a base type.
+            2. Vec %*% Mat.
+        For case 1, matrix multiplication is valid iff self has only one row.
+        For case 2, matrix multiplication is valid iff # of rows in self and length of other are equal.
+        Call of this function with array as other should be rejected.
+
+        :param other: LHS.
+
+        :return: other %*% self.
+
+        :raise ArrErr[DIM_MISMATCH]: If dimensions of two matrices are not compatible for matrix multiplication.
+        """
         if type(other) == Arr:
             return NotImplemented
 
@@ -769,6 +803,7 @@ class Mat(Arr):
     def __ror__(self, other: Any) -> Mat:
         return self.__or__(other)
 
+    # Refer to the comments of Arr.__invert__.
     def __invert__(self) -> Mat:
         return Mat([~it for it in self._elem], self._dim.copy())
 
@@ -801,7 +836,7 @@ class Mat(Arr):
         :raise ArrErr[EMPTY_IDX]: If index list is empty.
         :raise ArrErr[IDX_BOUND]: If index is out of bound.
         :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
-                                    distributive case.
+                                    componentwise case.
         """
         if len(idx) > 2:
             return self.promote(len(idx) - 1).update(idx, val)
@@ -893,18 +928,33 @@ class Mat(Arr):
     """
 
     def __apply(self, other: Any, op: Callable) -> Mat:
+        """
+        Applies binary operator op.
+
+        For detail, refer to the comments of Arr.__apply.
+        Note that call of this function with array as other should be rejected.
+
+        :param other: RHS.
+        :param op: Operator to be applied.
+
+        :return: Result.
+
+        :raise ArrErr[DIM_MISMATCH]: If # of elements does not match during applying rule [BinOpComp].
+        """
         if type(other) == Arr:
             return NotImplemented
 
         if type(other) == Vec:
             return op(self, other.promote(1))
         elif type(other) == Mat:
+            # [BinOpComp]
             if self._dim[0] != other._dim[0]:
                 raise ArrErr(Errno.DIM_MISMATCH, op='componentwise binary operation', dim1=str(self._dim),
                              dim2=str(other._dim))
 
             return Mat([op(self._elem[i], other._elem[i]) for i in range(self._dim[0])], self._dim.copy())
         else:
+            # [BinOpDist]
             return Mat([op(it, other) for it in self._elem], self._dim.copy())
 
     """
@@ -913,40 +963,63 @@ class Mat(Arr):
 
     def format(self, w: int, h: int, it_w: int, h_remain: bool = False) -> Union[str, Tuple[str, int]]:
         """
-        Formats matrix properly.
-        If the given height and width are enough, all elements will be formatted.
-        If the given height is enough but the given width is not,
-        the exceeding column will be formatted using the remaining height.
-        If the given width is enough but the given height si not, the exceeding rows will not be formatted.
-        If the given height and width are not enough, exceeding columns and rows will not be formatted.
-        The first line consists of column indices and the following lines starts with the corresponding row index.
-        Empty matrix will be formatted as 'Empty matrix with dimension m by n'.
+        Formats matrix.
+
+
+        The first line of the formatted string shows column indices.
+        Then starting from the second line, elements of a matrix will be formatted row by row,
+        with the corresponding row index leading each line.
+
+        Regarding the size of a matrix, there are four possible scenarios:
+            1. A matrix is small enough to fit in the given width w and height h.
+            2. A matrix has too many columns so that the given w is not enough to format all columns.
+            3. A matrix has too may rows so that the given h is not enough to format all rows.
+            4. A matrix has too many rows & columns so that it cannot fit in the given w and h.
+        The first case has no problem. For the last two cases, elements which cannot be formatted will be omitted.
+        For the second case, the original matrix will be blocked into two parts:
+        one with columns lying within the given w and one with the exceeding columns.
+        Then the formatted string of the first block will be followed by that of the second block.
+        If the second block has exceeding columns again,
+        the procedure above will be applied continuously until the given h exhausts.
+
+        In any cases, if there are any omitted elements,
+        a line presenting # of omitted elements will be attached at the end.
+        Empty matrix will be formatted as 'Empty matrix with dimension m by 0'.
+
+        For details, refer to the comments of Vec.format.
 
         :param w: Width of the output.
         :param h: Height of the output.
-        :param it_w: Maximum width of the element in the matrix.
+        :param it_w: Maximum width of an element.
         :param h_remain: If true, it returns # of used lines. (Default: False)
 
-        :return: Tuple consists of formatted matrix and # of lines used.
+        :return: Formatted string.
         """
         if self._dim[-1] == 0:
-            buf: str = f'Empty matrix with dimension {self._dim[0]} by {self._dim[1]}'
+            buf: str = f'Empty matrix with dimension {self._dim[0]} by 0'
 
             return (buf, h - 1) if h_remain else buf
 
+        # [Step 1]
         buf: str = ''
+        # Computes the upper limit for # of columns which will be actually formatted.
+        # For details, refer to the comments of Vec.format.
         c_cnt: int = min(ceil(w / 3), self._dim[1])
+        # The exact # of rows to be formatted can be determined easily: it is just min(h - 1, p) where p is # of rows.
         m: int = min(h - 1, self._dim[0])
 
+        # For case 2 described above,
+        # the # of blocks which will be actually formatted cannot exceed ceil(h/p) where p is # of rows.
+        # Therefore, # of columns which will be actually formatted cannot exceed ceil(h/p) * ceil(w/3).
         if h > self._dim[0]:
             c_cnt *= ceil(h / self._dim[0])
             c_cnt = min(c_cnt, self._dim[1])
 
         pool: List[List[Optional[str]]] = [[None for _ in range(c_cnt)] for _ in range(m)]
         qt: bool = (type(self._elem[0][0]) == str)
+        # Refer to the comments of Vec.format.
         it_w, mat_it_w = 0, it_w - 2 * qt
 
-        # Stringfy 'enough' elements.
         for i in range(m):
             for j in range(c_cnt):
                 it_str: str = str(self._elem[i][j])
@@ -957,14 +1030,28 @@ class Mat(Arr):
                 it_w = max(it_w, len(it_str))
                 pool[i][j] = it_str
 
-        # Determine exact # of elements which can be formatted.
-        r_idx_w: int = len(str(m)) + 3
+        # [Step 2]
+        # Given m, the row indices preceding each line will be 0, 1, ..., (m - 1).
+        # The largest width among them is achieved by the last one
+        # and note that there should be enclosing brackets with a comma.
+        r_idx_w: int = len(str(m - 1)) + 3
+        # In determination of the element width, we should consider column indices.
+        # Column indices grows from 0 to c_cnt, and thus the largest width is achieved by c_cnt.
+        # Also note that like row indices, there show be enclosing brackets with a comma.
+        # Here, we do not consider the case where there are TOO MANY columns (>= 10^7)
+        # since those columns cannot be formatted anyhow.
+        # (Unless one sets w or h as very large values. Just don't do that...)
         it_w = max(it_w, len(str(c_cnt)) + 3)
+        # Refer to the comments of Vec.format.
         n: int = floor(w / (it_w + 2))
+        # Given m and n, we can determine the exact # of blocks for case 2.
+        # It will be given as ceil(q/n) where q is # of columns but should not exceed ceil((h - 1)/(m + 1)).
+        # Here, (m + 1) accounts for one additional line for column indices
+        # and (h - 1) is a little trick to prevent the last line being column indices.
         l: int = min(ceil((h - 1) / (m + 1)), ceil(self._dim[1] / n))
         k: int = 0
 
-        # Format each element.
+        # [Step 3]
         while k < l - 1:
             buf += ' ' * r_idx_w
 
@@ -1012,7 +1099,7 @@ class Mat(Arr):
         resi -= min(m, h - m * l + m - l) * min(n, self._dim[1] - n * (l - 1))
         h_use: int = m * l + l - m + min(m, h - m * l + m - l)
 
-        # Attach the last line indicating # of the omitted elements if needed.
+        # [Step 4]
         if resi > 0:
             buf.rstrip()
             buf += f'\n... and {resi} more elements in this matrix.'
@@ -1020,35 +1107,36 @@ class Mat(Arr):
 
         return (buf.rstrip(), h - h_use) if h_remain else buf.rstrip()
 
+    """
+    UTIL
+    """
+    # TODO: Need update?
+
     def rbind(self, v: Mat) -> Mat:
         if type(v) == Vec:
-            assert len(v) == self._dim[1]
-
             self.append(v)
         else:
-            assert self._dim[1] == v._dim[1]
-
             self.append(v.elem)
 
         return self
 
     def cbind(self, v: Mat) -> Mat:
         if type(v) == Vec:
-            assert len(v) == self._dim[0]
-
             for i in range(self._dim[0]):
                 self._elem[i].append(v[i])
 
             self._dim[1] += 1
         else:
-            assert self._dim[0] == v._dim[0]
-
             for i in range(self._dim[0]):
                 self._elem[i].append(v[i].elem)
 
             self._dim[1] += v._dim[1]
 
         return self
+
+    """
+    GETTER & SETTER
+    """
 
     @property
     def nrow(self) -> int:
@@ -1105,6 +1193,21 @@ class Vec(Mat):
         return self.__mul__(other)
 
     def __matmul__(self, other: Any) -> Mat:
+        """
+        Multiplies two matrices.
+
+        There are two cases where this function is being called.
+            1. Vec %*% a where a is a base type.
+            2. Vec %*% Vec.
+        For either case, matrix multiplication is valid iff self is a vector or length 1.
+        Call of this function with array or matrix as other should be rejected.
+
+        :param other: RHS.
+
+        :return: self %*% other.
+
+        :raise ArrErr[DIM_MISMATCH]: If dimensions of two matrices are not compatible for matrix multiplication.
+        """
         if type(other) == Mat or type(other) == Arr:
             return NotImplemented
 
@@ -1115,6 +1218,19 @@ class Vec(Mat):
         return Vec([self._elem[0] * other]).promote(1) if type(other) == Vec else Vec([self * other]).promote(1)
 
     def __rmatmul__(self, other: Any) -> Mat:
+        """
+        Multiplies two matrices.
+
+        The only case where this function is being called is a %*% Vec where a is a base type.
+        In this case, matrix multiplication is always possible. So there is no dimension check.
+        Call of this function with array or matrix as other should be rejected.
+
+        :param other: LHS.
+
+        :return: other %*% self.
+
+        :raise ArrErr[DIM_MISMATCH]: If dimensions of two matrices are not compatible for matrix multiplication.
+        """
         if type(other) == Mat or type(other) == Arr:
             return NotImplemented
 
@@ -1177,6 +1293,7 @@ class Vec(Mat):
     def __ror__(self, other: Any) -> Vec:
         return self.__or__(other)
 
+    # Refer to the comments of Arr.__invert__.
     def __invert__(self) -> Vec:
         return Vec([not it for it in self._elem])
 
@@ -1261,7 +1378,7 @@ class Vec(Mat):
         :raise ArrErr[EMPTY_IDX]: If index list is empty.
         :raise ArrErr[IDX_BOUND]: If index is out of bound.
         :raise ArrErr[ASGN_N_MISS]: If # indices of index list does not match with # of items in val in
-                                    distributive case.
+                                    componentwise case.
         """
         if len(idx) > 1:
             return self.promote(len(idx) - 1).update(idx, val)
@@ -1343,16 +1460,31 @@ class Vec(Mat):
     """
 
     def __apply(self, other: Any, op: Callable) -> Vec:
+        """
+        Applies binary operator op.
+
+        For detail, refer to the comments of Arr.__apply.
+        Note that call of this function with array or matrix as other should be rejected.
+
+        :param other: RHS.
+        :param op: Operator to be applied.
+
+        :return: Result.
+
+        :raise ArrErr[DIM_MISMATCH]: If # of elements does not match during applying rule [BinOpComp].
+        """
         if type(other) == Mat or type(other) == Arr:
             return NotImplemented
 
         if type(other) == Vec:
+            # [BinOpComp]
             if self._dim[0] != other._dim[0]:
                 raise ArrErr(Errno.DIM_MISMATCH, op='componentwise binary operation', dim1=str(self._dim),
                              dim2=str(other._dim))
 
             return Vec([op(self._elem[i], other._elem[i]) for i in range(len(self))])
         else:
+            # [BinOpDist]
             return Vec([op(it, other) for it in self._elem])
 
     """
@@ -1365,21 +1497,21 @@ class Vec(Mat):
 
         It builds up a formatted string of a vector so that it 'roughly' fits in the given width w and height h.
         The point here is that it 'roughly' fits, NOT exactly fits.
-        Formatting vector so that it exactly fits in requires more complicated logic including backtracking technique.
+        Exact fitting requires more complicated logic including backtracking technique.
         Elements whose string expression exceeds the limit it_w will be abbreviated.
         For abbreviation and basic formatting policies, refer to the comments of Printer.format.
 
-        Each line starts with the index of the first element presented in that line.
-        Then consecutive elements follows until the given width is reached.
+        Each line starts with the index of the first element to be presented in that line.
+        Then consecutive elements will follow until the given width is reached.
         If there are too many elements in a vector so that some of them cannot be formatted,
-        a line presenting # of omitted elemets will be attached at the end.
+        a line presenting # of omitted elements will be attached at the end.
         Empty vector will be formatted as 'Empty vector'.
 
         The rough flow of the logic is as follows:
             1. Stringfy 'enough' number of elements in a vector.
-            2. Determine the exact # of elements to be printed out.
-            3. Build up the resultant string.
-            4. Attaches the last line indicating # of omitted elements if needed.
+            2. Determine the exact # of elements to be formatted.
+            3. Format vector elements.
+            4. Attach the last line indicating # of omitted elements if needed.
 
         :param w: Width of the output.
         :param h: Height of the output.
@@ -1395,12 +1527,12 @@ class Vec(Mat):
         buf: str = ''
         # Suppose all elements have string expression with length 1.
         # Since there should be (at least) 2 spaces b/w elements, each elements will eat up 3 spaces.
-        # Then at most ceil(w / 3) elements can be formatted in a single line.
-        # Thus # of elements which will be actually formatted cannot exceed ceil(w / 3) * h.
+        # Then at most ceil(w/3) elements can be formatted in a single line.
+        # Thus # of elements which will be actually formatted cannot exceed ceil(w/3)h.
         it_cnt: int = min(ceil(w / 3) * h, self._dim[0])
         pool: List[Optional[str]] = [None] * it_cnt
         qt: bool = (type(self._elem[0]) == str)
-        # In case of string elements, we need double quote(") enclosing each of them.
+        # In case of string elements, we need double quotes(") enclosing each of them.
         # This can be considered as it_w being reduced by 2.
         it_w, max_it_w = 0, it_w - 2 * qt
 
@@ -1414,15 +1546,14 @@ class Vec(Mat):
             pool[i] = it_str
 
         # [Step 2]
-        # Now it_w is exactly the largest (after abbreviation) width of elements which can be formatted.
-        # Then each element eats up exactly it_w + 2 spaces and exactly floor(w / (it_w + 2)) of elements can be
+        # Now it_w is exactly the largest (after abbreviation) width of the elements which can be formatted.
+        # Then each element eats up exactly (it_w + 2) spaces and exactly floor(w/(it_w + 2)) of elements can be
         # formatted in a single line.
         n: int = floor(w / (it_w + 2))
-        # Given n, it needs exactly ceil(self._dim[0] / n) lines to format all elements.
+        # Given n, it needs exactly ceil(p/n) lines to format all elements where p is # of elements.
         m: int = min(ceil(self._dim[0] / n), h)
-        # Given m, index preceding each line will be 0, n, ..., n * (m - 1).
-        # The largest width among them is achieved by the last one and
-        # note that there should be bracket [ and ] enclosing those indices.
+        # Given m, indices preceding each line will be 0, n, ..., n(m - 1).
+        # The largest width among them is achieved by the last one and note that there should be enclosing brackets.
         idx_w: int = len(str(n * (m - 1))) + 2
         i: int = 0
 
@@ -1458,5 +1589,5 @@ class Vec(Mat):
 
 
 """
-COMMENT WRITTEN: 2021.3.2.
+COMMENT WRITTEN: 2021.3.3.
 """
