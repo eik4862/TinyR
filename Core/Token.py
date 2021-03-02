@@ -7,14 +7,16 @@ from .Type import *
 class Tok:
     """
     Token class.
+
+    This class is the end of inheritance. No further inheritance is allowed.
     """
 
     def __init__(self, t: TokT, v: Any = None, pos: int = -1) -> None:
         # Token type.
         self.__t: TokT = t
         # Token value.
-        # For array token and struct token, this field will be assigned latter by interpreter.
-        # For void token and EOF token, this field will be never assigned.
+        # For array token and struct token, this field will be assigned by interpreter.
+        # For void token and EOF token, this field will never be assigned.
         # For other tokens, this field will be assigned at the time of instantiation by lexer.
         self.__v: Any = v
         # Position in the raw input string where the token is derived.

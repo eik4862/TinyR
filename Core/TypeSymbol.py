@@ -5,12 +5,12 @@ from .Type import *
 """
 CLASSES REPRESENTING TYPES.
 
-There are two category of types: base type and composite type.
-Only numeric, boolean, string, and void are base types.
+There are two categories for types: base type and composite type.
+Numeric, boolean, string, and void are base types.
 Other types, array, struct, and function, are all composite types.
-Composite types are represented by using base types and some additional information.
+Composite types are defined by using base types and some additional information.
 
-Actually, module Type defines one more type, NA.
+Module Type defines one more type, which is NA.
 However, NA type must be used temporarily, like placeholder.
 Most operations and functions on types implicitly assume that there is no NA type.
 """
@@ -20,16 +20,16 @@ class TSym:
     """
     Root class for type symbols.
 
-    For most cases, this class should not be instantiated.
+    In most cases, this class should not be instantiated.
     Instead, use this class as a wild card meaning 'any type symbol'.
     Nevertheless, there are some special occasions where instance of this class is quite useful.
     In such occasions, extra care must be taken since the instance has NA type, unless specified.
     """
 
     def __init__(self, t: T = T.NA) -> None:
-        # Symbol type. Subclasses which are used in most cases automatically fills in this field properly.
+        # Symbol type. Subclasses fill in this field automatically with proper value.
         self.__t: T = t
-        # Flag indicating whether the symbol is base type or not.
+        # Flag indicating whether the type is base type or not.
         self.__base: bool = t in [T.NUM, T.BOOL, T.STR, T.VOID]
 
     """
@@ -49,7 +49,7 @@ class TSym:
         """
         Determines whether two types are equal or not.
 
-        Rules determining an equality of two types are as follows:
+        Rules determining the equality of two types are as follows:
             1. a == b if a and b are the same base type.                                               [EqBase]
             2. Arr[a, m] == Arr[b, n] if a == b and m = n.                                             [EqArr]
             3. ((a1, ..., ap) => b) == ((c1, ..., cq) => d) if ai == ci for all i, b == d, and p = q.  [EqFun]
@@ -57,6 +57,10 @@ class TSym:
                and for any id, type of a[id] and that of b[id] are equal.                              [EqStrt]
 
         NA type should not be compared.
+
+        :param other: Type to be tested.
+
+        :return: True if self == other. False otherwise.
         """
         if self.__t != other.__t:
             return False
@@ -78,42 +82,55 @@ class TSym:
 
     def __le__(self, other: TSym) -> bool:
         """
-        Determines whether type a is a subtype of type b or not.
+        Determines whether type self is a subtype of type other or not.
 
         Rules determining subtype relation are as follows:
-            1. a <: b if a == b.  [SubEq]
-            2. Void <: a for any type a.  [SubVoid]
-            3. Bool <: Num.  [SubBool]
-            4. a <: Arr[b, n] if a <: b and a is base type.  [SubArr1]
-            5. Arr[a, n] <: Arr[b, m] if a <: b and n <= m.  [SubArr2]
-            6.
+            1. a <: b if a == b.                                                                      [SubEq]
+            2. Void <: a for any type a.                                                              [SubVoid]
+            3. Bool <: Num.                                                                           [SubBoolNum]
+            4. a <: Arr[b, n] if a <: b and a is base type.                                           [SubBaseArr]
+            5. Arr[a, n] <: Arr[b, m] if a <: b and n <= m.                                           [SubArr]
+            6. ((a1, ..., ap) => b) <: ((c1, ... cq) => d) if ai <: ci for all i, b <: d, and p = q.  [SubFun]
+            7. For struct type a and b, a <: b iff both have the same ids
+               and for any id, type of a[id] is a subtype of that of b[id].                           [SubStrt]
 
         NA type should not be compared.
+
+        :param other: Type to be tested.
+
+        :return: True if self <: other. False otherwise.
         """
         if self.__t == T.VOID:
+            # [SubVoid]
             return True
         elif self.__t == T.BOOL and other.__t == T.NUM:
+            # [SubBoolNum]
             return True
         elif self.__base and other.__base and self == other:
+            # [SubEq]
             return True
 
         if other.__t == T.ARR:
             if self.__base:
+                # [SubBaseArr]
                 return self <= other.elem
             elif self.__t == T.ARR:
+                # [SubArr]
                 return self.elem <= other.elem and self.dept <= other.dept
 
         if self.__t == other.__t == T.FUN:
+            # [SubFun]
             if len(self.args) != len(other.args):
                 return False
 
             return all([self.args[i] <= other.args[i] for i in range(len(self.args))]) and self.ret <= other.ret
 
         if self.__t == other.__t == T.STRT:
+            # [SubStrt]
             if len(self.elem) != len(other.elem):
                 return False
 
-            for k, t1 in self.elem:
+            for k, t1 in self.elem.items():
                 t2: Optional[TSym] = other.elem.get(k, None)
 
                 if t2 is None or not (t1 <= t2):
@@ -126,67 +143,118 @@ class TSym:
     @staticmethod
     def sup(*set_: TSym) -> Optional[TSym]:
         """
-        This method computes supremum of the given types set.
-        Supremum of type set A = {a1, ..., ap} is defined as type b such that satisfies the followings:
-            1. For any i <= p, ai <: b.
-            2. For any type c such that satisfies condition 1, b <: c.
-        Note that since subtype system is not preorder, supremum of some sets does not exist.
+        Computes supremum of the given type set.
+
+        Supremum of type set {a1, ..., ap} is defined as type b st.
+            1. For any type ai, ai <: b.
+            2. For any type c st. satisfies the first condition, b <: c.
+        Since subtype system is not a preorder, supremum of some sets may not exist.
         Also, supremum of an empty set does not exist.
 
-        sup({a1, ..., ap, ap+1}) = sup({sup({a1, ..., ap}), ap+1})
-        sup({a}) = a
-        sup({a, b}) = a if b <: a
-        sup({a, Arr[b, n]}) = Arr[b, n] if a <: b and a is base type.
-        sup({a, Arr[a, n]}) = Arr[a, n] if b <: a and a is base type.
-        sup({Arr[a, m], Arr[b, n]}) = Arr[b, max(m, n)] if a <: b
+        Rules determining supremum are as follows:
+            1. Sup({a1, ..., ap, a(p+1)}) => Sup({Sup({a1, ..., ap}), a(p+1)}).                      [SupRec]
+            2. Sup({a}) => a.                                                                        [SupSngl]
+            3. Sup({a, b}) => a if b <: a.                                                           [SupSub]
+            4. Sup({a, Arr[b, n]}) => Arr[Sup(a, b), n] if a is base type.                           [SupBaseArr]
+            6. Sup({Arr[a, m], Arr[b, n]}) => Arr[Sup(a, b), max(m, n)].                             [SupArr]
+            7. Sup({(a1, ..., ap) => b, (c1, ..., cq) => d}) =>
+                                        ((Sup({a1, c1}), ..., Sup({ap, cq})) => sup(b, d)) if p = q. [SupFun]
+            8. Supremum of set consists of two struct types a and b is a struct type c st.
+                8.1. Ids of c are the same with those of a(and b).
+                8.2. For any id, type of c[id] is supremum of {type of a[id], type of b[id]}.
+               if a and b have the same ids.                                                         [SupStrt]
 
         :param set_: Set of types whose supremum is to be computed.
 
-        :return: Supremum of the given set. If the supremum does not exists, it returns None.
+        :return: Supremum of set_. None if it does not exists.
         """
         if len(set_) == 0:
             return None
+        elif len(set_) == 1:
+            # [SupSngl]
+            return set_[0]
+        elif len(set_) > 2:
+            # [SupRec]
+            t: Optional[TSym] = TSym.sup(*set_[:-1])
+            return None if t is None else TSym.sup(t, set_[-1])
 
-        sup_t: TSym = VoidTSym()
-
-        for t in set_:
-            if sup_t.__base:
-                if t.__base:
-                    if sup_t <= t:
-                        sup_t = t
-                    elif not (t <= sup_t):
-                        return None
-                elif t.__t == T.ARR:
-                    if sup_t <= t.elem:
-                        sup_t = t
-                    elif t.elem <= sup_t:
-                        sup_t = ArrTSym(sup_t, t.dept)
-                    else:
-                        return None
+        if set_[0].__base:
+            if set_[1].__base:
+                # [SupSub]
+                if set_[0] <= set_[1]:
+                    return set_[1]
+                elif set_[1] <= set_[0]:
+                    return set_[0]
                 else:
                     return None
-            elif sup_t.__t == T.ARR:
-                if t.__base:
-                    if sup_t.elem <= t:
-                        sup_t = ArrTSym(t, sup_t.dept)
-                    elif not (t <= sup_t.elem):
-                        return None
-                elif t.__t == T.ARR:
-                    if sup_t.elem <= t.elem:
-                        sup_t = ArrTSym(t.elem, max(sup_t.dept, t.dept))
-                    elif t.elem <= sup_t.elem:
-                        sup_t = ArrTSym(sup_t.elem, max(sup_t.dept, t.dept))
-                    else:
-                        return None
-                else:
-                    return None
+            elif set_[1].__t == T.ARR:
+                # [SupBaseArr]
+                elem: Optional[TSym] = TSym.sup(set_[0], set_[1].elem)
+
+                return None if elem is None else ArrTSym(elem, set_[1].dept)
+            else:
+                return None
+        elif set_[0].__t == T.ARR:
+            if set_[1].__base:
+                # [SupBaseArr]
+                elem: Optional[TSym] = TSym.sup(set_[0].elem, set_[1])
+
+                return None if elem is None else ArrTSym(elem, set_[0].dept)
+            elif set_[1].__t == T.ARR:
+                # [SupArr]
+                elem: Optional[TSym] = TSym.sup(set_[0].elem, set_[1].elem)
+
+                return None if elem is None else ArrTSym(elem, max(set_[0].dept, set_[1].dept))
             else:
                 return None
 
-        return sup_t
+        if set_[0].__t != set_[1].__t:
+            return None
+
+        if set_[0].__t == T.FUN:
+            # [SupFun]
+            if len(set_[0].args) != len(set_[1].args):
+                return None
+
+            args: List[TSym] = []
+
+            for i in range(len(set_[0].args)):
+                elem: Optional[TSym] = TSym.sup(set_[0].args[i], set_[1].args[i])
+
+                if elem is None:
+                    return None
+
+                args.append(elem)
+
+            ret: Optional[TSym] = TSym.sup(set_[0].ret, set_[01].ret)
+
+            return None if elem is None else FunTSym(args, ret)
+        elif set_[0].__t == T.STRT:
+            # [SupStrt]
+            if len(set_[0].elem) != len(set_[1].elem):
+                return None
+
+            elem: Dict[str, TSym] = {}
+
+            for k, t1 in set_[0].elem.items():
+                t2: Optional[TSym] = set_[1].elem.get(k, None)
+
+                if t2 is None:
+                    return None
+
+                t: Optional[TSym] = TSym.sup(t1, t2)
+
+                if t is None:
+                    return None
+
+                elem[k] = t
+
+            return StrtTSym(elem)
+
+        return None
 
     """
-    GETTERS & SETTERS
+    GETTER & SETTER
     """
 
     @property
@@ -199,7 +267,7 @@ class TSym:
 
 
 """
-BASE TYPES
+BASE TYPE: NUMERIC, STRING, BOOLEAN, AND VOID.
 """
 
 
@@ -248,23 +316,26 @@ class VoidTSym(TSym):
 
 
 """
-COMPOSITE TYPES
+BASE TYPE: ARRAY, FUNCTION, AND STRUCT
+
+Array type is defined by the type of elements and depth(# of dimensions).
+Note that all elements of an array must be identical.
+
+Function type is defined by the list composed of the types of arguments and the return type.
+Function type with no input arguments is valid, but missing or multiple return types are not.
+
+Struct type is defined by the dictionary which contains ids of members and their types.
+Struct type with no members at all is valid.
 """
 
 
 @final
 class ArrTSym(TSym):
     def __init__(self, elem: TSym, dept: int) -> None:
-        """
-        Array type is defined by two components, type of element and depth(# of nesting).
-        For example, [2, 3] is Arr[Num, 1] and [[T, T], [F, F]] is Arr[Bool, 2].
-        There is no array with depth 0.
-
-        :param elem: Type of element.
-        :param dept: Depth of the array.
-        """
         super().__init__(T.ARR)
+        # Type of elements.
         self.__elem: TSym = elem
+        # Depth(# of dimensions)
         self.__dept: int = dept
 
     def __str__(self) -> str:
@@ -285,6 +356,7 @@ class ArrTSym(TSym):
 class FunTSym(TSym):
     def __init__(self, args: List[TSym], ret: TSym) -> None:
         super().__init__(T.FUN)
+        # Argument types. Can be an empty list which represents function with no input arguments.
         self.__args: List[TSym] = args
         self.__ret: TSym = ret
 
@@ -306,11 +378,9 @@ class FunTSym(TSym):
 
 @final
 class StrtTSym(TSym):
-    def __init__(self, elem: Dict[str, TSym] = None) -> None:
-        if elem is None:
-            elem = {}
-
+    def __init__(self, elem: Dict[str, TSym]) -> None:
         super().__init__(T.STRT)
+        # Types of members with their ids. Can be an empty dictionary which represents an empty struct.
         self.__elem: Dict[str, TSym] = elem
 
     def __str__(self) -> str:

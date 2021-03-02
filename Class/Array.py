@@ -1036,12 +1036,12 @@ class Mat(Arr):
         # and note that there should be enclosing brackets with a comma.
         r_idx_w: int = len(str(m - 1)) + 3
         # In determination of the element width, we should consider column indices.
-        # Column indices grows from 0 to c_cnt, and thus the largest width is achieved by c_cnt.
+        # Column index grows from 0 to (c_cnt - 1), and thus the largest width is achieved by c_cnt.
         # Also note that like row indices, there show be enclosing brackets with a comma.
         # Here, we do not consider the case where there are TOO MANY columns (>= 10^7)
         # since those columns cannot be formatted anyhow.
         # (Unless one sets w or h as very large values. Just don't do that...)
-        it_w = max(it_w, len(str(c_cnt)) + 3)
+        it_w = max(it_w, len(str(c_cnt - 1)) + 3)
         # Refer to the comments of Vec.format.
         n: int = floor(w / (it_w + 2))
         # Given m and n, we can determine the exact # of blocks for case 2.
