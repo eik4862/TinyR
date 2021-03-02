@@ -58,3 +58,8 @@ class Tok:
     @pos.setter
     def pos(self, pos: int) -> NoReturn:
         self.__pos = pos
+
+
+"""
+COMMENT WRITTEN: 2021.3.2.
+"""

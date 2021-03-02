@@ -52,9 +52,9 @@ class TSym:
         Rules determining the equality of two types are as follows:
             1. a == b if a and b are the same base type.                                               [EqBase]
             2. Arr[a, m] == Arr[b, n] if a == b and m = n.                                             [EqArr]
-            3. ((a1, ..., ap) => b) == ((c1, ..., cq) => d) if ai == ci for all i, b == d, and p = q.  [EqFun]
-            4. Two struct types a and b are equal iff they have the same ids
+            3. Two struct types a and b are equal iff they have the same ids
                and for any id, type of a[id] and that of b[id] are equal.                              [EqStrt]
+            4. ((a1, ..., ap) => b) == ((c1, ..., cq) => d) if ai == ci for all i, b == d, and p = q.  [EqFun]
 
         NA type should not be compared.
 
@@ -71,12 +71,12 @@ class TSym:
         elif self.__t == T.ARR:
             # [EqArr]
             return self.elem.__t == other.elem.__t and self.dept == other.dept
-        elif self.__t == T.FUN:
-            # [EqFun]
-            return self.args == other.args and self.ret == other.ret
         elif self.__t == T.STRT:
             # [EqStrt]
             return self.elem == other.elem
+        elif self.__t == T.FUN:
+            # [EqFun]
+            return self.args == other.args and self.ret == other.ret
 
         return False
 
@@ -90,9 +90,9 @@ class TSym:
             3. Bool <: Num.                                                                           [SubBoolNum]
             4. a <: Arr[b, n] if a <: b and a is base type.                                           [SubBaseArr]
             5. Arr[a, n] <: Arr[b, m] if a <: b and n <= m.                                           [SubArr]
-            6. ((a1, ..., ap) => b) <: ((c1, ... cq) => d) if ai <: ci for all i, b <: d, and p = q.  [SubFun]
-            7. For struct type a and b, a <: b iff both have the same ids
+            6. For struct type a and b, a <: b iff both have the same ids
                and for any id, type of a[id] is a subtype of that of b[id].                           [SubStrt]
+            7. ((a1, ..., ap) => b) <: ((c1, ... cq) => d) if ai <: ci for all i, b <: d, and p = q.  [SubFun]
 
         NA type should not be compared.
 
@@ -118,13 +118,6 @@ class TSym:
                 # [SubArr]
                 return self.elem <= other.elem and self.dept <= other.dept
 
-        if self.__t == other.__t == T.FUN:
-            # [SubFun]
-            if len(self.args) != len(other.args):
-                return False
-
-            return all([self.args[i] <= other.args[i] for i in range(len(self.args))]) and self.ret <= other.ret
-
         if self.__t == other.__t == T.STRT:
             # [SubStrt]
             if len(self.elem) != len(other.elem):
@@ -137,6 +130,13 @@ class TSym:
                     return False
 
             return True
+
+        if self.__t == other.__t == T.FUN:
+            # [SubFun]
+            if len(self.args) != len(other.args):
+                return False
+
+            return all([self.args[i] <= other.args[i] for i in range(len(self.args))]) and self.ret <= other.ret
 
         return False
 
@@ -157,12 +157,12 @@ class TSym:
             3. Sup({a, b}) => a if b <: a.                                                           [SupSub]
             4. Sup({a, Arr[b, n]}) => Arr[Sup(a, b), n] if a is base type.                           [SupBaseArr]
             6. Sup({Arr[a, m], Arr[b, n]}) => Arr[Sup(a, b), max(m, n)].                             [SupArr]
-            7. Sup({(a1, ..., ap) => b, (c1, ..., cq) => d}) =>
-                                        ((Sup({a1, c1}), ..., Sup({ap, cq})) => sup(b, d)) if p = q. [SupFun]
-            8. Supremum of set consists of two struct types a and b is a struct type c st.
-                8.1. Ids of c are the same with those of a(and b).
-                8.2. For any id, type of c[id] is supremum of {type of a[id], type of b[id]}.
+            7. Supremum of set consists of two struct types a and b is a struct type c st.
+                7.1. Ids of c are the same with those of a(and b).
+                7.2. For any id, type of c[id] is supremum of {type of a[id], type of b[id]}.
                if a and b have the same ids.                                                         [SupStrt]
+            8. Sup({(a1, ..., ap) => b, (c1, ..., cq) => d}) =>
+                                        ((Sup({a1, c1}), ..., Sup({ap, cq})) => sup(b, d)) if p = q. [SupFun]
 
         :param set_: Set of types whose supremum is to be computed.
 
@@ -211,25 +211,7 @@ class TSym:
         if set_[0].__t != set_[1].__t:
             return None
 
-        if set_[0].__t == T.FUN:
-            # [SupFun]
-            if len(set_[0].args) != len(set_[1].args):
-                return None
-
-            args: List[TSym] = []
-
-            for i in range(len(set_[0].args)):
-                elem: Optional[TSym] = TSym.sup(set_[0].args[i], set_[1].args[i])
-
-                if elem is None:
-                    return None
-
-                args.append(elem)
-
-            ret: Optional[TSym] = TSym.sup(set_[0].ret, set_[01].ret)
-
-            return None if elem is None else FunTSym(args, ret)
-        elif set_[0].__t == T.STRT:
+        if set_[0].__t == T.STRT:
             # [SupStrt]
             if len(set_[0].elem) != len(set_[1].elem):
                 return None
@@ -250,6 +232,24 @@ class TSym:
                 elem[k] = t
 
             return StrtTSym(elem)
+        elif set_[0].__t == T.FUN:
+            # [SupFun]
+            if len(set_[0].args) != len(set_[1].args):
+                return None
+
+            args: List[TSym] = []
+
+            for i in range(len(set_[0].args)):
+                elem: Optional[TSym] = TSym.sup(set_[0].args[i], set_[1].args[i])
+
+                if elem is None:
+                    return None
+
+                args.append(elem)
+
+            ret: Optional[TSym] = TSym.sup(set_[0].ret, set_[1].ret)
+
+            return None if elem is None else FunTSym(args, ret)
 
         return None
 
@@ -268,6 +268,8 @@ class TSym:
 
 """
 BASE TYPE: NUMERIC, STRING, BOOLEAN, AND VOID.
+
+Following classes are the end of inheritance. No further inheritance is allowed.
 """
 
 
@@ -316,16 +318,18 @@ class VoidTSym(TSym):
 
 
 """
-BASE TYPE: ARRAY, FUNCTION, AND STRUCT
+COMPOSITE TYPE: ARRAY, STRUCT, AND FUNCTION
 
 Array type is defined by the type of elements and depth(# of dimensions).
 Note that all elements of an array must be identical.
 
+Struct type is defined by the dictionary which contains ids of members and their types.
+Struct type with no members at all is valid.
+
 Function type is defined by the list composed of the types of arguments and the return type.
 Function type with no input arguments is valid, but missing or multiple return types are not.
 
-Struct type is defined by the dictionary which contains ids of members and their types.
-Struct type with no members at all is valid.
+Following classes are the end of inheritance. No further inheritance is allowed.
 """
 
 
@@ -353,6 +357,23 @@ class ArrTSym(TSym):
 
 
 @final
+class StrtTSym(TSym):
+    def __init__(self, elem: Dict[str, TSym]) -> None:
+        super().__init__(T.STRT)
+        # Types of members with their ids. Can be an empty dictionary which represents an empty struct.
+        self.__elem: Dict[str, TSym] = elem
+
+    def __str__(self) -> str:
+        return str(self.__elem)
+
+    __repr__ = __str__
+
+    @property
+    def elem(self) -> Dict[str, TSym]:
+        return self.__elem
+
+
+@final
 class FunTSym(TSym):
     def __init__(self, args: List[TSym], ret: TSym) -> None:
         super().__init__(T.FUN)
@@ -376,18 +397,6 @@ class FunTSym(TSym):
         return self.__ret
 
 
-@final
-class StrtTSym(TSym):
-    def __init__(self, elem: Dict[str, TSym]) -> None:
-        super().__init__(T.STRT)
-        # Types of members with their ids. Can be an empty dictionary which represents an empty struct.
-        self.__elem: Dict[str, TSym] = elem
-
-    def __str__(self) -> str:
-        return str(self.__elem)
-
-    __repr__ = __str__
-
-    @property
-    def elem(self) -> Dict[str, TSym]:
-        return self.__elem
+"""
+COMMENT WRITTEN: 2021.3.2.
+"""

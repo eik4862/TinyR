@@ -181,7 +181,7 @@ class SemanticChk:
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
         if len(ch_t) == 0:
-            t: TSym = StrtTSym()
+            t: TSym = StrtTSym({})
         else:
             elem_t: Dict[str, TSym] = {}
 
