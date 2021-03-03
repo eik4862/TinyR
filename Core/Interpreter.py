@@ -14,7 +14,9 @@ class Interp:
     Interpreter class.
 
     Traverses through AST and interprets.
-    It is implemented as singleton.
+
+    This class is implemented as a singleton. The singleton object will be instantiated at its first call.
+    This class is the end of inheritance. No further inheritance is allowed.
     """
     # Singleton object.
     __inst: ClassVar[Interp] = None
@@ -27,14 +29,47 @@ class Interp:
         return cls.__inst
 
     def __init__(self) -> None:
+        # AST to be interpreted.
         self.__ast: Optional[AST] = None
+        # Raw input string.
         self.__line: str = ''
 
     """
     INTERPRETING LOGIC
+    
+    Interpretation of AST is rather simple and straightforward.
+    During a traversal, if it encounters operator or built-in function, 
+    then it calls the function attached to the node and passes all values contained in the children.
+    The result of the computation will be set as a value of the node.
+    Especially, if it encounters an assignment, it also updates the symbol table.
+    If it encounters nodes with array or struct, it constructs array (or its subclasses) or struct object 
+    using values of the children and assigns the object as a value of the node.
+    If it encounters member of struct, it reassigns the value of the node as a pair of id and the value of the child.
+    If it encounters variable, it looks up the symbol table and reassigns the value of the node as the looked up value.
+    If it encounters other terminal nodes, it does nothing.
+    
+    However, there are some complications regarding assignment, array (or its subclasses) construction.
+    Those logic is implemented separately.
+    
+    Most of the logic below is for internal use only.
     """
 
     def __interp_op(self, ast: AST) -> NoReturn:
+        """
+        Computes operator.
+
+        For exponentiation, interpreting should be done from the rightmost child
+        because of its right to left associativity.
+        For other operators, interpretation can be done from the leftmost child.
+        Although unary plus and minus has right to left associativity,
+        it has no need to take care of them since they has only one child.
+
+        All exceptions (including built-in exceptions of Python) should be caught here
+        and the erroneous position in the raw input string with the string itself should be properly assigned.
+        Then it will be rethrown.
+
+        :raise InterpErr[KERNEL_ERR]: If Python raises exceptions during computation.
+        """
         if ast.tok.v == OpT.EXP:
             self.__interp_hlpr(ast.ch[1])
             self.__interp_hlpr(ast.ch[0])
@@ -52,6 +87,7 @@ class Interp:
         except Exception as e:
             raise InterpErr(ast.tok.pos, self.__line, Errno.KERNEL_ERR, k_msg=str(e))
 
+    # TODO: interpreting order?
     def __interp_asgn(self, ast: AST) -> NoReturn:
         self.__interp_hlpr(ast.ch[1])
         self.__interp_hlpr(ast.ch[0])
@@ -87,6 +123,17 @@ class Interp:
             ast.tok.v = ast.ch[1].tok.v
 
     def __interp_arr(self, ast: AST) -> NoReturn:
+        """
+        Constructs array or its subclasses.
+
+        During construction, promotion should be considered.
+        From the result of type inference, we know the depth(# of dimensions), say d, of the resultant array.
+        If the value of a certain child has depth c < (d - 1), then promote it (d - c - 1) times.
+        For base types, just think as if they have depth 0.
+        Also, it must check whether the dimensions of elements are identical or not.
+
+        :raise InterpErr[DIM_MISMATCH]: If the dimensions of elements are not identical.
+        """
         for node in ast.ch:
             self.__interp_hlpr(node)
 
@@ -101,6 +148,7 @@ class Interp:
                 elem.append(deepcopy(curr_v).promote(dept - curr_v.dept - 1))
                 dim_new: List[int] = elem[-1].dim
             elif dept > 1:
+                # Since base type has no promotion function, promote it once manually.
                 elem.append(Vec([deepcopy(curr_v)]).promote(dept - 2))
                 dim_new: List[int] = elem[-1].dim
             else:
@@ -122,6 +170,9 @@ class Interp:
             ast.tok.v = Arr(elem, [len(ast.ch), *dim_old])
 
     def __interp_strt(self, ast: AST) -> NoReturn:
+        """
+        Constructs struct.
+        """
         for node in ast.ch:
             self.__interp_hlpr(node)
 
@@ -129,7 +180,7 @@ class Interp:
 
     def __interp_hlpr(self, ast: AST) -> NoReturn:
         """
-        Traverses AST and interprets.
+        Routes interpreting logic according to the type of currently visiting node ast.
 
         :param ast: AST to be interpreted.
 
@@ -137,7 +188,6 @@ class Interp:
                           with errno NOT_IMPLE.
         :raise InterpErr: If kernel raises exception during computation, it raises exception with errno KERNEL_ERR.
         """
-        # Lookup symbol table and retrieve assigned value.
         if ast.tok.t == TokT.VAR and not ast.lval:
             ast.tok.v = SymTab.inst().lookup_v(ast.tok.v)
 
@@ -146,8 +196,6 @@ class Interp:
 
             ast.tok.v = (ast.tok.v, ast.ch[0].tok.v)
 
-        # OP token with ASGN or EXP is right to left associative.
-        # Thus, the rightmost child should be interpreted first.
         elif ast.tok.t == TokT.OP:
             if ast.tok.v == OpT.ASGN:
                 self.__interp_asgn(ast)

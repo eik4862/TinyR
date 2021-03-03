@@ -5,7 +5,6 @@ from .Parser import *
 from Error.Exception import *
 
 
-# TODO: kwargs unnecessary/duplicated, member id duplicated?
 @final
 class SemanticChk:
     """
@@ -14,8 +13,8 @@ class SemanticChk:
     Traverses through AST and checks semantics.
     Semantic checking does the followings:
         1. Static type inference.                                           [ChkT]
-        2. Detect a usage of a variable without assignment.                 [ChkVar]
-        3. Determine whether LHS of an assignment is valid l-value of not.  [ChkLVal]
+        2. Detect usages of variables without assignment.                   [ChkVar]
+        3. Determine whether LHS of an assignment is valid l-value or not.  [ChkLVal]
         4. Detect duplicated member ids in a struct.                        [ChkDup]
     Logic for each is interwoven so that semantic checking process can be done during a single traversal.
 
@@ -107,7 +106,7 @@ class SemanticChk:
     
     [ChkDup] is trivial and straightforward.
     
-    Most of this logic is for internal use only.
+    Most of the logic below is for internal use only.
     """
 
     def __chk_mem(self, ast: AST) -> NoReturn:
@@ -118,8 +117,8 @@ class SemanticChk:
         [ChkVar] Type of a child should not be NA.
         [ChkLVal] Cannot be a l-value.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
         """
         # [ChkLVal]
         if ast.lval:
@@ -142,8 +141,8 @@ class SemanticChk:
         [ChkVar] Type of a child should not be NA.
         [ChkLVal] Cannot be a l-value.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
         """
         # [ChkLVal]
         if ast.lval:
@@ -173,9 +172,9 @@ class SemanticChk:
         t_chk function returns both inferred type and function pointer(handle) which will be called for interpretation.
         It attaches these returns to ast.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[SGNTR_NFOUND]: If there is a type error.
         """
         # [ChkLVal]
         if ast.lval:
@@ -218,8 +217,8 @@ class SemanticChk:
 
         For function t_chk, refer to the comments of SemanticChk.__chk_op.
 
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[SGNTR_NFOUND]: If there is a type error.
         """
         # [ChkLVal]
         ast.ch[0].lval = ast.lval
@@ -260,10 +259,13 @@ class SemanticChk:
         [ChkLVal] Cannot be a l-value. But its left child should be l-value.
 
         For function t_chk, refer to the comments of SemanticChk.__chk_op.
+        All SemanticChkErr exceptions with errno INVALID_LVAL should be caught here
+        and the erroneous position in the raw input string should be properly assigned.
+        Then it will be rethrown.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[ASGN_T_MISS]: If there is a type error.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[ASGN_T_MISS]: If there is a type error.
         """
         # [ChkLVal]
         if ast.lval:
@@ -313,9 +315,9 @@ class SemanticChk:
         [ChkVar] Types of children should not be NA.
         [ChkLVal] Cannot be a l-value.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[INHOMO_ELEM]: If types of the elements of an array are not identical.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[INHOMO_ELEM]: If types of the elements of an array are not identical.
         """
         # [ChkLVal]
         if ast.lval:
@@ -349,9 +351,9 @@ class SemanticChk:
         [ChkLVal] Cannot be a l-value.
         [ChkDup] Duplicated member ids are not allowed.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[ID_DUP]: If some member ids are duplicated.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[ID_DUP]: If some member ids are duplicated.
         """
         # [ChkLVal]
         if ast.lval:
@@ -390,11 +392,22 @@ class SemanticChk:
         [ChkVar] Types of children should not be NA.
         [ChkLVal] Cannot be a l-value.
 
-        
+        With semantic check, it does one more thing to simplify interpretation: fill-in.
+        That is, it fills in missing keyword arguments with their predefined default values.
+        After fill-in, KWARG tokens are not needed anymore, so they are replaced by their children.
+        That is, after fill-in, one can safely assume that the user has passed all arguments following the right order.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
-        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        During fill-in, the following policies will be adopted:
+            Suppose that a built-in foo takes m non-keyword arguments and n keyword arguments with id id1, ..., idn.
+            1. If the user passed p (> m) non-keyword arguments,
+               those following the mth one will be considered as keyword arguments with id id1, ..., id(p - m).
+            2. If the user passed keyword arguments with duplicated ids, then only the first one will be adopted.
+               Others will be abandoned silently.
+            3. If the user passed keyword arguments not following the predefined order, then they will be ordered.
+
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[SGNTR_NFOUND]: If there is a type error.
         """
         # [ChkLVal]
         if ast.lval:
@@ -403,6 +416,7 @@ class SemanticChk:
         kwargs: List[Tuple[str, Any]] = ast.tok.v.kwargs
         ch: List[AST] = []
 
+        # Fill-in
         i: int = 0
 
         while i < len(ast.ch) and ast.ch[i].tok.t != TokT.KWARG:
@@ -447,7 +461,6 @@ class SemanticChk:
         Routes semantic checking logic according to the type of currently visiting node ast.
 
         Checking logic for terminal nodes are implemented here since they are quite simple.
-
         [ChkT] - [TNum]
             env |- n => env, Num
         [ChkT] - [TBool]
@@ -467,7 +480,7 @@ class SemanticChk:
 
         :param ast: AST to be checked.
 
-        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
         """
         if ast.tok.t == TokT.NUM:
             # [ChkLVal]
@@ -534,7 +547,7 @@ class SemanticChk:
 
         :return: Checked AST.
 
-        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
         """
         self.__ast = ast
         self.__line = line

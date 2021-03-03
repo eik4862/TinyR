@@ -468,7 +468,7 @@ class Arr:
     Note that a op a cannot be handled by classes in this module, thus it should be handled somewhere else.
     Operator module will do this.
     
-    This logic is for internal use only.
+    The logic below is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Arr:
@@ -924,7 +924,7 @@ class Mat(Arr):
     APPLICATION LOGIC
 
     Refer to the comments of Arr class.
-    This logic is for internal use only.
+    The logic below is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Mat:
@@ -1456,7 +1456,7 @@ class Vec(Mat):
     APPLICATION LOGIC
 
     Refer to the comments of Arr class.
-    This logic is for internal use only.
+    The logic below is for internal use only.
     """
 
     def __apply(self, other: Any, op: Callable) -> Vec:

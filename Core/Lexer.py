@@ -96,7 +96,7 @@ class Lexer:
         Id    = [A-Za-z]+[A-Za-z0-9_]*
         Op    = ^ | **? | + | - | : | %(* | /)?% | * | / | <=? | ==? | >=? | ! | &&? | ||? | ( | ) | [ | ] | { | } | ,
     
-    Most of this logic is for internal use only.
+    Most of the logic below is for internal use only.
     """
 
     def __skip_white(self) -> NoReturn:

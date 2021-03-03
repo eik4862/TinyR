@@ -36,7 +36,7 @@ class Parser:
     """
     HELPER FOR PARSING LOGIC
     
-    This logic is for internal use only.
+    The logic below is for internal use only.
     """
 
     def __eat(self) -> NoReturn:
@@ -103,7 +103,7 @@ class Parser:
                   | Fun LPAR Var ASGN expr (COM Var ASGN expr)* RPAR
                   | Fun LPAR expr (COM expr)* COM Var ASGN expr (COM Var ASGN expr)* RPAR
                   
-    This grammar (and some trick) naturally resolves ambiguity regarding
+    This grammar (and some tricks) naturally resolves ambiguity regarding
         1. SEQ: It can represent both sequence construction operator 
                 and delimiter which separates member id of struct and its value.
         2. ASGN: It can represent both assignment 
@@ -114,7 +114,7 @@ class Parser:
     For ADD, SUB, LPAR and RPAR, it sets connections b/w them and other AST nodes differently according to their usage.
     Then there will be no ambiguity anymore.
     
-    Most of this logic is for internal use only.
+    Most of the logic below is for internal use only.
     """
 
     def __expr(self) -> AST:
@@ -279,7 +279,7 @@ class Parser:
 
     def __idx_expr(self) -> AST:
         """
-        idx_expr = term (LBRA expr? (COM expr?)* RBRA)
+        idx_expr = term (LBRA expr? (COM expr?)* RBRA)*
 
         :raise ParserErr[NCLOSED_PARN]: If a closing bracket(]) is missing.
         """
@@ -450,12 +450,12 @@ class Parser:
                  | Fun LPAR expr (COM expr)* COM Var ASGN expr (COM Var ASGN expr)* RPAR
 
         It resolves the ambiguity regarding ASGN.
-        However, with the help of grammar, it needs other information: id of keyword arguments.
+        To do this it needs information on ids of keyword arguments.
         Suppose that built-in foo takes two arguments, one being non-keyword argument
         and the other being keyword argument with id y.
         Then foo(x = 2, y = 3) should be interpreted foo(2, 3) where the first ASGN is indeed an assignment
         but the second one is a delimiter.
-        To resolve such ambiguity, it looks up ids of keywords of the called built-in by calling Fun.is_kw.
+        Thus it looks up ids of keywords of the called built-in by calling Fun.is_kw.
 
         :raise ParserErr[INCOMP_EXPR]: If a delimiter(=) is missing or unexpected tokens are encountered.
         :raise ParserErr[FUN_CALL_MISS]: If a opening parenthesis(() is missing.

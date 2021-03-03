@@ -47,7 +47,7 @@ class CLib:
     """
     TYPE CASTING LOGIC
     
-    This logic is for internal use only.
+    The logic below is for internal use only.
     """
 
     @staticmethod
