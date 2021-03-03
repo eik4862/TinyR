@@ -465,7 +465,7 @@ class Arr:
         a op Arr  [Arr]  Vec op Arr  [Arr]  Mat op Arr  [Arr]  Arr op Arr  [Arr]
     Here, a stands for base type like numeric and the class in bracket indicates the class responsible for
     handling the corresponding case.
-    Note that a op a cannot be handled by any of classes in this module, thus it should be handled somewhere else.
+    Note that a op a cannot be handled by classes in this module, thus it should be handled somewhere else.
     Class Op will do this.
     
     This logic is for internal use only.

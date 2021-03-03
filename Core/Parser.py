@@ -12,7 +12,10 @@ class Parser:
     Parser class.
 
     Builds AST from the raw input string.
-    It is implemented as singleton.
+    It takes tokens from lexer and forms connections b/w them following the grammar.
+
+    This class is implemented as a singleton. The singleton object will be instantiated at its first call.
+    This class is the end of inheritance. No further inheritance is allowed.
     """
     # Singleton object.
     __inst: ClassVar[Parser] = None
@@ -25,23 +28,101 @@ class Parser:
         return cls.__inst
 
     def __init__(self) -> None:
+        # Raw input string.
         self.__line: str = ''
+        # Token received from lexer. This field is automatically managed internally.
         self.__curr_tok: Optional[Tok] = None
 
+    """
+    HELPER FOR PARSING LOGIC
+    
+    This logic is for internal use only.
+    """
+
     def __eat(self) -> NoReturn:
+        """
+        Get next token to process from lexer and set the received one as a current token.
+        """
         self.__curr_tok = Lexer.inst().next_tok()
 
     """
     PARSING LOGIC
+    
+    It employs LL(Leftmost derivation) parsing strategy.
+    Precedence and associativity of operators are as follows:
+        Precedence  Operator    Character  Description                            Associativity
+        1           LPAR, RPAR  ( ... )    Function call                          Left to right
+                    LBRA, RBRA  [ ... ]    Array construction
+                    LCUR, RCUR  { ... }    Struct construction
+        2           LBRA, RBRA  [ ... ]    Indexing                               Left to right
+        3           EXP         ^ | **     Exponentiation                         Right to left
+        4           ADD         +          Unary plus                             Right to left
+                    SUB         -          Unary minus
+        5           SEQ         :          Sequence construction                  Left to right
+        6           MATMUL      %*%        Matrix multiplication                  Left to right
+                    MOD         %%         Modular operation
+                    QUOT        %/%        Quotient operation
+        7           MUL         *          Multiplication                         Left to right
+                    DIV         /          Division
+        8           ADD         +          Addition                               Left to right
+                    SUB         -          Subtraction
+        9           LSS         <          Comparison (less than)                 Left to right
+                    LEQ         <=         Comparison (less than or equal to)
+                    GRT         >          Comparison (greater than)
+                    GEQ         >=         Comparison (greater than or equal to)
+                    EQ          ==         Comparison (equal to)
+                    NEQ         !=         Comparison (not equal to)
+        10          NEG         !          Boolean negation                       Right to left
+        11          AND         & | &&     Logical and                            Left to right
+        12          OR          | | ||     Logical or                             Left to right
+        13          ASGN        =          Assignment                             Left to right
+        14          COM         ,          Comma                                  Left to right
+    Precedence with smaller number stands for higher precedence.
+    
+    Considering the precedence and associativity described above, grammar for LL parsing is as follows:
+        expr      = or_expr (ASGN or_expr)*
+        or_expr   = and_expr (OR and_expr)*
+        and_expr  = neg_expr (AND neg_expr)*
+        neg_expr  = NEG* comp_expr
+        comp_expr = add_expr ((LSS | LEQ | GRT | GEQ | EQ | NEQ) add_expr)*
+        add_expr  = mul_expr ((ADD | SUB) mul_expr)*
+        mul_expr  = rem_expr ((MUL | DIV) rem_expr)*
+        rem_expr  = seq_expr ((MATMUL | MOD | QUOT) seq_expr)*
+        seq_expr  = pls_expr (SEQ pls_expr)*
+        pls_expr  = (ADD | SUB)* exp_expr
+        exp_expr  = (idx_expr EXP)* idx_expr
+        idx_expr  = term (LBRA expr? (COM expr?)* RBRA)
+        term      = LPAR expr RPAR
+                  | arr_expr
+                  | strt_expr
+                  | fun_expr
+                  | (Num | Bool | Str | Var)
+        arr_expr  = LBRA (expr (COM expr)*)? RBRA
+        strt_expr = LCUR (Var SEQ expr (COM Var SEQ expr)*)? RCUR
+        fun_expr  = Fun LPAR (expr (COM expr)*)? RPAR
+                  | Fun LPAR Var ASGN expr (COM Var ASGN expr)* RPAR
+                  | Fun LPAR expr (COM expr)* COM Var ASGN expr (COM Var ASGN expr)* RPAR
+                  
+    This grammar (and some trick) naturally resolves ambiguity regarding
+        1. SEQ: It can represent both sequence construction operator 
+                and delimiter which separates member id of struct and its value.
+        2. ASGN: It can represent both assignment 
+                 and delimiter which separates id of keyword parameter and value to be passed.
+        3. LPAR, RPAR: It can represent both parenthesis in arithmetic and function call.
+        4. ADD, SUB: They can be both unary and binary.
+    It replaces SEQ used as a delimiter with MEMID token, ASGN used as a delimiter with KWARG token.
+    For ADD, SUB, LPAR and RPAR, it sets connections b/w them and other AST nodes differently according to their usage.
+    Then there will be no ambiguity anymore.
+    
+    Most of this logic is for internal use only.
     """
 
     def __expr(self) -> AST:
         """
-        expr = or_expr (= or_expr)*
+        expr = or_expr (ASGN or_expr)*
         """
         rt: AST = self.__or_expr()
 
-        # Since assignment is right to left associative.
         if self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.ASGN:
             rt_tok: Tok = self.__curr_tok
 
@@ -52,11 +133,10 @@ class Parser:
 
     def __or_expr(self) -> AST:
         """
-        or_expr = and_expr (| and_expr)*
+        or_expr = and_expr (OR and_expr)*
         """
         rt: AST = self.__and_expr()
 
-        # Since or operation is left to right associative.
         while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.OR:
             rt_tok: Tok = self.__curr_tok
 
@@ -67,11 +147,10 @@ class Parser:
 
     def __and_expr(self) -> AST:
         """
-        and_expr = neg_expr (& neg_expr)*
+        and_expr = neg_expr (AND neg_expr)*
         """
         rt: AST = self.__neg_expr()
 
-        # Since and operation is left to right associative.
         while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.AND:
             rt_tok: Tok = self.__curr_tok
 
@@ -82,7 +161,7 @@ class Parser:
 
     def __neg_expr(self) -> AST:
         """
-        neg_expr = !* comp_expr
+        neg_expr = NEG* comp_expr
         """
         if self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.NEG:
             rt_tok: Tok = self.__curr_tok
@@ -95,11 +174,10 @@ class Parser:
 
     def __comp_expr(self) -> AST:
         """
-        comp_expr = add_expr ((<|<=|>|>=|==|!=) add_expr)*
+        comp_expr = add_expr ((LSS | LEQ | GRT | GEQ | EQ | NEQ) add_expr)*
         """
         rt: AST = self.__add_expr()
 
-        # Since comparison is left to right associative.
         while self.__curr_tok.t == TokT.OP and \
                 self.__curr_tok.v in [OpT.LSS, OpT.LEQ, OpT.GRT, OpT.GEQ, OpT.EQ, OpT.NEQ]:
             rt_tok: Tok = self.__curr_tok
@@ -111,11 +189,10 @@ class Parser:
 
     def __add_expr(self) -> AST:
         """
-        add_expr = mul_expr((+|-) mul_expr)*
+        add_expr = mul_expr ((ADD | SUB) mul_expr)*
         """
         rt: AST = self.__mul_expr()
 
-        # Since addition and subtraction are left to right associative.
         while self.__curr_tok.t == TokT.OP and (self.__curr_tok.v == OpT.ADD or self.__curr_tok.v == OpT.SUB):
             rt_tok: Tok = self.__curr_tok
 
@@ -126,11 +203,10 @@ class Parser:
 
     def __mul_expr(self) -> AST:
         """
-        mul_expr = rem_expr ((*|/) rem_expr)*
+        mul_expr = rem_expr ((MUL | DIV) rem_expr)*
         """
         rt: AST = self.__rem_expr()
 
-        # Since multiplication and division are left to right associative.
         while self.__curr_tok.t == TokT.OP and (self.__curr_tok.v == OpT.MUL or self.__curr_tok.v == OpT.DIV):
             rt_tok: Tok = self.__curr_tok
 
@@ -141,11 +217,10 @@ class Parser:
 
     def __rem_expr(self) -> AST:
         """
-        rem_expr = seq_expr ((%*%|%%|%/%) seq_expr)*
+        rem_expr = seq_expr ((MATMUL | MOD | QUOT) seq_expr)*
         """
         rt: AST = self.__seq_expr()
 
-        # Since matrix multiplication, mod operation, and quotient operation are left to right associative.
         while self.__curr_tok.t == TokT.OP and self.__curr_tok.v in [OpT.MATMUL, OpT.MOD, OpT.QUOT]:
             rt_tok: Tok = self.__curr_tok
 
@@ -156,11 +231,10 @@ class Parser:
 
     def __seq_expr(self) -> AST:
         """
-        seq_expr = pls_expr(:pls_expr)*
+        seq_expr = pls_expr (SEQ pls_expr)*
         """
         rt: AST = self.__pls_expr()
 
-        # Since sequence construction operation is left to right associative.
         while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.SEQ:
             rt_tok: Tok = self.__curr_tok
 
@@ -171,7 +245,7 @@ class Parser:
 
     def __pls_expr(self) -> AST:
         """
-        pls_expr = (+|-)* exp_expr
+        pls_expr = (ADD | SUB)* exp_expr
         """
         if self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.ADD:
             rt_tok: Tok = self.__curr_tok
@@ -190,11 +264,10 @@ class Parser:
 
     def __exp_expr(self) -> AST:
         """
-        exp_expr = idx_expr (^ idx_expr)*
+        exp_expr = (idx_expr EXP)* idx_expr
         """
         rt: AST = self.__idx_expr()
 
-        # Since exponentiation is right to left associative.
         if self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.EXP:
             rt_tok: Tok = self.__curr_tok
 
@@ -206,9 +279,9 @@ class Parser:
 
     def __idx_expr(self) -> AST:
         """
-        idx_expr = term([expr? (, expr?)*])*
+        idx_expr = term (LBRA expr? (COM expr?)* RBRA)
 
-        :raise ParserErr: Input without closing bracket(]) raises exception with errno NCLOSED_PARN.
+        :raise ParserErr[NCLOSED_PARN]: If a closing bracket(]) is missing.
         """
         rt: AST = self.__term()
 
@@ -257,19 +330,15 @@ class Parser:
 
     def __term(self) -> AST:
         """
-        term = (expr)
+        term = LPAR expr RPAR
              | arr_expr
              | strt_expr
              | fun_expr
-             | Numeric
-             | Boolean
-             | String
-             | Variable
+             | (Num | Bool | Str | Var)
 
-        :raise ParserErr: Input without closing parenthesis()) raises exception with errno NCLOSED_PARN.
-        :raise ParserErr: Incomplete input raises exception with errno INCOMP_EXPR.
-        :raise ParserErr: Any other 'non-terminal' tokens encountered at this level raise exception
-                          with errno INVALID_TOK.
+        :raise ParserErr[NCLOSED_PARN]: If a closing parenthesis()) is missing.
+        :raise ParserErr[INCOMP_EXPR]: If EOF token is encountered.
+        :raise ParserErr[INVALID_TOK]: If unexpected tokens are encountered.
         """
         rt_tok: Tok = self.__curr_tok
 
@@ -302,9 +371,9 @@ class Parser:
 
     def __arr_expr(self) -> AST:
         """
-        arr_expr = [(expr (, expr)*)?]
+        arr_expr = LBRA (expr (COM expr)*)? RBRA
 
-        :raise ParserErr: Input without closing bracket(]) raises exception with errno NCLOSED_PARN.
+        :raise ParserErr[NCLOSED_PARN]: If a closing bracket(]) is missing.
         """
         rt_tok: Tok = self.__curr_tok
         elem: List[AST] = []
@@ -327,7 +396,11 @@ class Parser:
 
     def __strt_expr(self) -> AST:
         """
-        strt_expr = {(id : expr (, id : expr)*)?}
+        strt_expr = LCUR (Var SEQ expr (COM Var SEQ expr)*)? RCUR
+
+        :raise ParserErr[NCLOSED_PARN]: If a closing curly bracket(}) is missing.
+        :raise ParserErr[MEMID_MISS]: If a member id is missing.
+        :raise ParserErr[INCOMP_EXPR]: If a delimiter(:) is missing.
         """
         rt_tok: Tok = self.__curr_tok
         elem: List = []
@@ -373,9 +446,22 @@ class Parser:
 
     def __fun_expr(self) -> AST:
         """
-        fun_expr = id ((expr (, expr)*)?)
-                 | id ((id = expr (, id = expr)*)?)
-                 | id (expr (, expr)*, id = expr (, id = expr)*)
+        fun_expr = Fun LPAR (expr (COM expr)*)? RPAR
+                 | Fun LPAR Var ASGN expr (COM Var ASGN expr)* RPAR
+                 | Fun LPAR expr (COM expr)* COM Var ASGN expr (COM Var ASGN expr)* RPAR
+
+        It resolves the ambiguity regarding ASGN.
+        However, with the help of grammar, it needs other information: id of keyword arguments.
+        Suppose that built-in foo takes two arguments, one being non-keyword argument
+        and the other being keyword argument with id y.
+        Then foo(x = 2, y = 3) should be interpreted foo(2, 3) where the first ASGN is indeed an assignment
+        but the second one is a delimiter.
+        To resolve such ambiguity, it looks up ids of keywords of the called built-in by calling Fun.is_kw.
+
+        :raise ParserErr[INCOMP_EXPR]: If a delimiter(=) is missing or unexpected tokens are encountered.
+        :raise ParserErr[FUN_CALL_MISS]: If a opening parenthesis(() is missing.
+        :raise ParserErr[NCLOSED_PARN]: If a closing parenthesis()) is missing.
+        :raise ParserErr[ARG_MISPOS]: If non-keyword arguments follows keyword arguments.
         """
         rt_tok: Tok = self.__curr_tok
         fun: Fun = rt_tok.v
@@ -449,14 +535,15 @@ class Parser:
     def parse(self, line: str) -> Optional[AST]:
         """
         Builds AST from the input raw string.
-        AST building utilizes LL parsing strategy.
+
+        For detail, refer to the comments above.
+        Note that after parsing, only EOF token should be left behind.
 
         :param line: Raw input string to be parsed.
 
         :return: Built AST.
 
-        :raise ParserErr: If there are left tokens after applying all grammar, it raises exception
-                          with errno INVALID_TOK.
+        :raise ParserErr: If tokens other than EOF token are left behind.
         """
         self.__line = line
 

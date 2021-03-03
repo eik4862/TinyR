@@ -90,11 +90,11 @@ class Lexer:
     
     Grammar for token derivation is as follows:
         White = [ \t\r\n\v\f]
-        Num = [0-9]+(.[0-9]*)?
-            | .[0-9]+
-        Str = ('|")[A-Za-z0-9]*('|")
-        Id = [A-Za-z]+[A-Za-z0-9_]*
-        Op = ^ | **? | + | - | : | %(* | /)?% | * | / | <=? | ==? | >=? | ! | &&? | ||? | ( | ) | [ | ] | { | } | ,
+        Num   = [0-9]+(.[0-9]*)?
+              | .[0-9]+
+        Str   = ('|")[A-Za-z0-9]*('|")
+        Id    = [A-Za-z]+[A-Za-z0-9_]*
+        Op    = ^ | **? | + | - | : | %(* | /)?% | * | / | <=? | ==? | >=? | ! | &&? | ||? | ( | ) | [ | ] | { | } | ,
     
     Most of this logic is for internal use only.
     """
@@ -109,7 +109,7 @@ class Lexer:
 
         :return: Derived numeric token.
 
-        :raise ParserErr[INVALID_TOK]: If a dot(.) is solely given.
+        :raise ParserErr[INVALID_TOK]: If a dot(.) is solely used.
         """
         pivot: int = self.__pos
 
@@ -157,7 +157,7 @@ class Lexer:
         Derives boolean, function, and variable tokens.
 
         It looks up keyword table to determine
-        whether the id represents keyword (or built-in function call) or variable.
+        whether an id represents a keyword (or a built-in function call) or a variable.
 
         :return: Derived boolean, function, or variable token.
         """
@@ -179,15 +179,20 @@ class Lexer:
         """
         Derives operator, array, and struct tokens.
 
-        Some operators are ambiguous.
-        Most of ambiguity stems from the fact that
+        There are two types of ambiguity.
+        The first type of ambiguity stems from the fact that
         some operator characters contain other operator characters as their substring.
         For example, * can be multiplication or exponentiation with succeeding *.
-        Looking ahead some characters resolves most of these ambiguity issues.
-        What left is ambiguity regarding indexing operator and array construction operator.
-        These two share the same operator character, left bracket([). Thus, it is context-sensitive grammar.
+        By looking ahead some characters this type of ambiguity can be resolved easily.
+
+        The second type of ambiguity stems from the fact that our grammar if not fully context-free.
+        For example, left bracket([) can represents both array construction operator and indexing operator.
+        Its interpretation depends on 'how' it is used, that is, the context in which it is used.
+        Most of this type of ambiguity will be resolved by parser.
+        Here, only one case will be handled: ambiguity regarding left bracket described above.
         To resolve this, it resorts on the fact that indexing can appear only after right parenthesis()),
         right bracket(]), id of a variable([A-Za-z0-9_]), and numeric([0-9] | .).
+        For other resolution strategies, refer to the comments of Parser class.
 
         :return: Derived operator, array, or struct token.
 
@@ -328,11 +333,12 @@ class Lexer:
 
     def next_tok(self) -> Tok:
         """
-        Derives a token starting from the position pointed by self.__curr_char.
+        Derives the next token succeeding the token it previously derived.
 
-        Starting position will be automatically updated internally.
+        At the first time of its call (after initialization), it returns the first token.
+        If it hits the end of the input string, it returns EOF token.
 
-        :return: Derived token. EOF token if it hits the end of the input string.
+        :return: Refer to the paragraph 2 in the comments above.
 
         :raise ParserErr[INVALID_TOK]: If unexpected characters are encountered.
         """
@@ -380,3 +386,8 @@ class Lexer:
 
         for i in range(len(res)):
             print(f'[{i}] {res[i]}')
+
+
+"""
+COMMENT WRITTEN: 2021.3.3.
+"""
