@@ -91,7 +91,7 @@ class Parser:
         seq_expr  = pls_expr (SEQ pls_expr)*
         pls_expr  = (ADD | SUB)* exp_expr
         exp_expr  = (idx_expr EXP)* idx_expr
-        idx_expr  = term (LBRA expr? (COM expr?)* RBRA)
+        idx_expr  = term (LBRA expr? (COM expr?)* RBRA)*
         term      = LPAR expr RPAR
                   | arr_expr
                   | strt_expr
@@ -285,7 +285,6 @@ class Parser:
         """
         rt: AST = self.__term()
 
-        # Since indexing is left to right associative.
         while self.__curr_tok.t == TokT.OP and self.__curr_tok.v == OpT.IDX:
             rt_tok: Tok = self.__curr_tok
             idx: List[AST] = []

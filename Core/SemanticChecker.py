@@ -13,9 +13,10 @@ class SemanticChk:
 
     Traverses through AST and checks semantics.
     Semantic checking does the followings:
-        1. Static type inference.                                           [chkT]
-        2. Detect usage of variable without assignment.                     [chkVar]
-        3. Determine whether LHS of an assignment is valid l-value of not.  [chkLVal]
+        1. Static type inference.                                           [ChkT]
+        2. Detect a usage of a variable without assignment.                 [ChkVar]
+        3. Determine whether LHS of an assignment is valid l-value of not.  [ChkLVal]
+        4. Detect duplicated member ids in a struct.                        [ChkDup]
     Logic for each is interwoven so that semantic checking process can be done during a single traversal.
 
     This class is implemented as a singleton. The singleton object will be instantiated at its first call.
@@ -40,90 +41,146 @@ class SemanticChk:
     """
     SEMANTIC CHECKING LOGIC
     
-    Logic for [chkT] is quite complicated, and thus most of them are deferred to Op class.
-    For detail, refer to the comments of Op class.
+    [ChkT] logic is quite complicated, and thus most of them are deferred to Operator module.
+    For detail, refer to the comments of Operator module.
     Here, only following inference rules are implemented:
         1. [TMem]
-           If   env |- expr => env', a
-           Then env |- id: expr => env', a
+           If   env |- e => env', a
+           Then env |- id: e => env', a
         2. [TKwarg]
-           If   env |- expr => env', a
-           Then env |- kw = expr => env', a
+           If   env |- e => env', a
+           Then env |- kw = e => env', a
         3. [TAsgn]
-           If   env |- expr => env', a
-           Then env |- Var = expr => env' U {Var: a}, a
+           If   e1 = x
+                env |- e => env', a
+           Then env |- e1 = e2 => env' U {Var: a}, a
         4. [TAsgnIdx]
-           If   Var is in env
-                env |- expr => env', a
-           Then env |- Var[idx] = expr => env', a
+           If   e1 = e'1[e'2]
+                env |- e1 => env', b
+                env' |- e2 => env'', a
+                a <: b
+           Then env |- e1 = e2 => env'', a
         5. [TSnglArr]
-           If   env(i - 1) |- expri => envi, ai for all i
+           If   env(i - 1) |- ei => envi, ai for all i
                 Sup(a1, ..., ap) = b is not array type
-           Then env0 |- [expr1, ..., exprp] => envp, Arr[b, 1]
+           Then env0 |- [e1, ..., ep] => envp, Arr[b, 1]
         6. [TDblArr]
-           If   env(i - 1) |- expri => envi, ai for all i
+           If   env(i - 1) |- ei => envi, ai for all i
                 Sup(a1, ..., ap) = Arr[b, n]
-           Then env0 |- [expr1, ..., exprp] => envp, Arr[b, n + 1]
+           Then env0 |- [e1, ..., ep] => envp, Arr[b, n + 1]
         7. [TStrt]
-           If   expri = idi: expr'i for all i
-                env(i - 1) |- expri => envi, ai for all i
-           Then env0 |- {expr1, ..., exprp} => envp, {id1: a1, ..., idp: ap}
+           If   ei = idi: e'i for all i
+                env(i - 1) |- ei => envi, ai for all i
+           Then env0 |- {e1, ..., ep} => envp, {id1: a1, ..., idp: ap}
         8. [TFun]
-           If   env(i - 1) |- expri => envi, ai for all i
-                envp |- Fun => ((bi, ..., bp) => c)
+           If   env(i - 1) |- ei => envi, ai for all i
+                envp[f] = (bi, ..., bp) => c
                 ai <: bi for all i
-           Then env0 |- Fun(expr1, ..., exprp) => envp, c
-    
-    [chkVar] can be done by checking whether inferred types of children are NA or not.
+           Then env0 |- f(e1, ..., ep) => envp, c
+        9. [TNum]
+           env |- n => env, Num
+        10. [TBool]
+            env |- b => env, Bool
+        11. [TStr]
+            env |- s => env, Str
+        12. [TVoid]
+            env |- v => env, Void
+        13. [TVarFound]
+            If   env[x] = a
+            Then env |- x => a
+        14. [TVarNFound]
+            If   x not in env
+            Then env |- x => NA
+        
+    [ChkVar] can be done by checking whether inferred types of children are NA or not.
     Since it looks up types of variables from symTab class, there should be no NA types after checking,
     unless a certain variable is used before assignment which is semantically wrong.
     Though, there is one minor exception: assignment to new variable.
     
-    Checking [chkLVal] is top-down process.
+    [ChkLVal] is top-down process.
     Logic for this check can be summarized as follows:
         1. expr1 = expr2 cannot be l-value itself,
-           but if the pattern is encountered, then expr1 should be l-value.    [LValAsgn]
-        2. Var can be l-value.                                                 [LValVar]
-        3. expr[idx] can be l-value and in that case, expr should be l-value.  [LValIdx]
+           but if the pattern is encountered, then expr1 should be l-value.
+        2. Var can be l-value.
+        3. expr1[expr2] can be l-value and in that case, expr should be l-value.
         4. All other patterns cannot be l-value.
+    
+    [ChkDup] is trivial and straightforward.
     
     Most of this logic is for internal use only.
     """
 
     def __chk_mem(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] - [TMem]
+            If   env |- e => env', a
+            Then env |- id: e => env', a
+        [ChkVar] Type of a child should not be NA.
+        [ChkLVal] Cannot be a l-value.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
         self.__chk_hlpr(ast.ch[0])
 
-        # [chkVar]
+        # [ChkVar]
         if ast.ch[0].t.t == T.NA:
             raise SemanticChkErr(ast.ch[0].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[0].tok.v)
 
-        # [chkT] - [TMem]
+        # [ChkT] - [TMem]
         ast.t = ast.ch[0].t
 
     def __chk_kwarg(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] - [TKwarg]
+            If   env |- e => env', a
+            Then env |- kw = e => env', a
+        [ChkVar] Type of a child should not be NA.
+        [ChkLVal] Cannot be a l-value.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
         self.__chk_hlpr(ast.ch[0])
 
-        # [chkVar]
+        # [ChkVar]
         if ast.ch[0].t.t == T.NA:
             raise SemanticChkErr(ast.ch[0].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[0].tok.v)
 
-        # [chkT] - [TKwarg]
+        # [ChkT] - [TKwarg]
         ast.t = ast.ch[0].t
 
     def __chk_op(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] Deferred to Operator module.
+        [ChkVar] Types of children should not be NA.
+        [ChkLVal] Cannot be a l-value.
+
+        For exponentiation, checking should be done from the rightmost child because of its right to left associativity.
+        For other operators, check can be done from the leftmost child.
+        Although unary plus and minus has right to left associativity,
+        it has no need to take care of them since they has only one child.
+
+        To outsource type inference, it calls t_chk function in Operator module.
+        t_chk function returns both inferred type and function pointer(handle) which will be called for interpretation.
+        It attaches these returns to ast.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
-        # Accounts for associativity.
         if ast.tok.v == OpT.EXP:
             self.__chk_hlpr(ast.ch[1])
             self.__chk_hlpr(ast.ch[0])
@@ -133,12 +190,12 @@ class SemanticChk:
 
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
-        # [chkVar]
+        # [ChkVar]
         for i in range(len(ch_t)):
             if ch_t[i].t == T.NA:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
-        # [chkT]
+        # [ChkT]
         if ast.tok.v <= OpT.DIV.value:
             t, hndl = Arith.t_chk(ast.tok.v, ch_t)
         elif ast.tok.v <= OpT.NEQ.value:
@@ -153,7 +210,18 @@ class SemanticChk:
         ast.call = hndl
 
     def __chk_idx(self, ast: AST) -> NoReturn:
-        # [chkLVal] - [LValIdx]
+        """
+        [ChkT] Deferred to Operator module.
+        [ChkVar] Types of children should not be NA.
+        [ChkLVal] It can be l-value and in that case,
+                  its first child which is the target of indexing operation should be l-value.
+
+        For function t_chk, refer to the comments of SemanticChk.__chk_op.
+
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        """
+        # [ChkLVal]
         ast.ch[0].lval = ast.lval
 
         for node in ast.ch:
@@ -161,12 +229,12 @@ class SemanticChk:
 
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
-        # [chkVar]
+        # [ChkVar]
         for i in range(len(ch_t)):
             if ch_t[i].t == T.NA:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
-        # [chkT]
+        # [ChkT]
         t, hndl = Sp.t_chk(ast.tok.v, ch_t, ast.lval)
 
         if t is None or hndl is None:
@@ -176,7 +244,28 @@ class SemanticChk:
         ast.call = hndl
 
     def __chk_asgn(self, ast: AST) -> NoReturn:
-        # [chkLVal] - [LValAsgn]
+        """
+        [ChkT] - [TAsgn]
+            If   e1 = Var
+                 env |- e2 => env', a
+            Then env |- e1 = e2 => env' U {Var: a}, a
+        [ChkT] - [TAsgnIdx]
+            If   e1 = e'1[e'2]
+                 env |- e1 => env', b
+                 env' |- e2 => env'', a
+                 a <: b
+            Then env |- e1 = e2 => env'', a
+        [ChkVar] Its left child can have NA type while its right child cannot.
+                 Left child whit NA type implies that it is an initial assignment.
+        [ChkLVal] Cannot be a l-value. But its left child should be l-value.
+
+        For function t_chk, refer to the comments of SemanticChk.__chk_op.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[ASGN_T_MISS]: If there is a type error.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
@@ -193,11 +282,11 @@ class SemanticChk:
 
         tar_t, val_t = ast.ch[0].t, ast.ch[1].t
 
-        # [chkVar]
+        # [ChkVar]
         if val_t.t == T.NA:
             raise SemanticChkErr(ast.tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[1].tok.v)
 
-        # [chkT]
+        # [ChkT]
         if tar_t.t == T.NA or ast.ch[0].tok.t == TokT.VAR:
             # [TAsgn]
             SymTab.inst().update_t(ast.ch[0].tok.v, val_t)
@@ -212,7 +301,23 @@ class SemanticChk:
         ast.t = val_t
 
     def __chk_arr(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] - [TSnglArr]
+            If   env(i - 1) |- ei => envi, ai for all i
+                 Sup(a1, ..., ap) = b is not array type
+            Then env0 |- [e1, ..., ep] => envp, Arr[b, 1]
+        [ChkT] - [TDblArr]
+            If   env(i - 1) |- ei => envi, ai for all i
+                 Sup(a1, ..., ap) = Arr[b, n]
+            Then env0 |- [e1, ..., ep] => envp, Arr[b, n + 1]
+        [ChkVar] Types of children should not be NA.
+        [ChkLVal] Cannot be a l-value.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[INHOMO_ELEM]: If types of the elements of an array are not identical.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
@@ -221,30 +326,34 @@ class SemanticChk:
 
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
-        # [chkVar]
+        # [ChkVar]
         for i in range(len(ch_t)):
             if ch_t[i].t == T.NA:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
-        # [chkT] - [TSnglArr] & [TDblArr]
-        if len(ch_t) == 0:
-            t: TSym = ArrTSym(VoidTSym(), 1)
-        else:
-            elem_t: Optional[TSym] = VoidTSym()
+        # [ChkT] - [TSnglArr] & [TDblArr]
+        elem_t: Optional[TSym] = TSym.sup(*ch_t)
 
-            # TODO: ????????? Too inefficient...
-            for t in ch_t:
-                elem_t = TSym.sup(elem_t, t)
+        if elem_t is None:
+            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.INHOMO_ELEM, infer=', '.join(map(str, ch_t)))
 
-                if elem_t is None:
-                    raise SemanticChkErr(ast.tok.pos, self.__line, Errno.INHOMO_ELEM, infer=', '.join(map(str, ch_t)))
-
-            t: TSym = ArrTSym(elem_t, 1) if elem_t.base else ArrTSym(elem_t.elem, elem_t.dept + 1)
-
-        ast.t = t
+        ast.t = ArrTSym(elem_t, 1) if elem_t.base else ArrTSym(elem_t.elem, elem_t.dept + 1)
 
     def __chk_strt(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] - [TStrt]
+            If   ei = idi: e'i for all i
+                 env(i - 1) |- ei => envi, ai for all i
+            Then env0 |- {e1, ..., ep} => envp, {id1: a1, ..., idp: ap}
+        [ChkVar] Types of children should not be NA.
+        [ChkLVal] Cannot be a l-value.
+        [ChkDup] Duplicated member ids are not allowed.
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[ID_DUP]: If some member ids are duplicated.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
@@ -254,14 +363,14 @@ class SemanticChk:
         id_: List[str] = [node.tok.v for node in ast.ch]
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
-        # [chkVar]
+        # [ChkVar]
         for i in range(len(ch_t)):
             if ch_t[i].t == T.NA:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
-        # [chkT] - [TStrt]
         elem_t: Dict[str, TSym] = {}
 
+        # [ChkT] - [TStrt], [ChkDup]
         for i in range(len(id_)):
             if id_[i] in elem_t:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.ID_DUP, id_=id_[i])
@@ -272,7 +381,22 @@ class SemanticChk:
         ast.t = t
 
     def __chk_fun(self, ast: AST) -> NoReturn:
-        # [chkLVal]
+        """
+        [ChkT] - [TFun]
+            If   env(i - 1) |- ei => envi, ai for all i
+                 envp[f] = (bi, ..., bp) => c
+                 ai <: bi for all i
+            Then env0 |- f(e1, ..., ep) => envp, c
+        [ChkVar] Types of children should not be NA.
+        [ChkLVal] Cannot be a l-value.
+
+        
+
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
+        :raise SemanticErr[SGNTR_NFOUND]: If there is a type error.
+        """
+        # [ChkLVal]
         if ast.lval:
             raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
@@ -306,12 +430,12 @@ class SemanticChk:
 
         ch_t: List[TSym] = [node.t for node in ast.ch]
 
-        # [chkVar]
+        # [ChkVar]
         for i in range(len(ch_t)):
             if ch_t[i].t == T.NA:
                 raise SemanticChkErr(ast.ch[i].tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.ch[i].tok.v)
 
-        # [chkT] - [TFun]
+        # [ChkT] - [TFun]
         if not (FunTSym(ch_t, ast.tok.v.t.ret) <= ast.tok.v.t):
             raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND, infer=str(FunTSym(ch_t, TSym())))
 
@@ -320,69 +444,61 @@ class SemanticChk:
 
     def __chk_hlpr(self, ast: AST) -> NoReturn:
         """
-        Checks the follows:
-            1. Type mismatch
-            2. Variable usage w.o. assignment
-            3. Not proper l-value
-        The first one is bottom-up process and the third one is top-down process.
-        These three checks are interwoven, thus the logic is somehow 'dirty'.
+        Routes semantic checking logic according to the type of currently visiting node ast.
 
-        [Type rules]
-        n => Num
-        b => Bool
-        s => Str
-        v => Void
-        Var[x] => a if T_TB[x] = a
-        Var[x] => NA if a is not in T_TB.
-        op(a1, ..., ap) => t_chk(op, [a1, ..., ap])
-        [a1, ..., ap] => t_chk([a1, ..., ap])
+        Checking logic for terminal nodes are implemented here since they are quite simple.
 
-        [Variable usage w.o. assignment]
-        Var[x] not found => Nil
-        Var[x] = b, Var[x] is not found => Nil, now Var[x] is assigned.
-        op(..., Var[x], ...), Var[x] is not found => Error
-        [..., Var[x], ...], Var[x] is not found => Error
-
-        [L-value rules]
-        Var[x] = b => Var[x] is l-value
-        Var[x] is l-value => Nil
-        Var[x][i1, ..., ip] is l-value => Var[x] is l-value
-        a is l-value => Error
+        [ChkT] - [TNum]
+            env |- n => env, Num
+        [ChkT] - [TBool]
+            env |- b => env, Bool
+        [ChkT] - [TStr]
+            env |- s => env, Str
+        [ChkT] - [TVoid]
+            env |- v => env, Void
+        [ChkT] - [TVarFound]
+            If   env[x] = a
+            Then env |- x => a
+        [ChkT] - [TVarNFound]
+            If   x not in env
+            Then env |- x => NA
+        [ChkVar] Terminal nodes have no children.
+        [ChkLVal] Only Var can be l-value. Other terminal nodes cannot be l-values.
 
         :param ast: AST to be checked.
 
-        :raise SemanticChkErr: Expression containing invalid l-values raises exception with errno INVALID_LVAL.
-        :raise SemanticChkErr: Expression containing the usage of variable before its assignment raise exception
-                               with errno NOT_DEFINE.
-        :raise SemanticChkErr: Expression containing array constructions with inhomogeneous elements raise exception
-                               with errno INHOMO_ELEM.
-        :raise SemanticChkErr: Expression containing operations with incompatible types raise exception
-                               with errno SGNTR_NFOUND.
+        :raise SemanticErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
         """
-        # Handle NUM, BOOL, STR, VOID, and VAR tokens.
-        # Except for VAR token, these cannot be l-value, thus raises exception.
-        # However, the position of wrong assignment will be assigned latter.
         if ast.tok.t == TokT.NUM:
+            # [ChkLVal]
             if ast.lval:
                 raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
+            # [ChkT] - [TNum]
             ast.t = NumTSym()
         elif ast.tok.t == TokT.BOOL:
+            # [ChkLVal]
             if ast.lval:
                 raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
+            # [ChkT] - [TBool]
             ast.t = BoolTSym()
         elif ast.tok.t == TokT.STR:
+            # [ChkLVal]
             if ast.lval:
                 raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
+            # [ChkT] - [TStr]
             ast.t = StrTSym()
         elif ast.tok.t == TokT.VOID:
+            # [ChkLVal]
             if ast.lval:
                 raise SemanticChkErr(-1, self.__line, Errno.INVALID_LVAL)
 
+            # [ChkT] - [TVoid]
             ast.t = VoidTSym()
         elif ast.tok.t == TokT.VAR:
+            # [ChkT] - [TVarFound] & [TVarNFound]
             var_t = SymTab.inst().lookup_t(ast.tok.v)
             ast.t = TSym() if var_t is None else var_t
         elif ast.tok.t == TokT.KWARG:
@@ -406,22 +522,26 @@ class SemanticChk:
     def chk(self, ast: AST, line: str) -> AST:
         """
         Checks semantics.
-        For details, refer to the comments in __chk_hlpr.
+
+        Traverses AST in postorder and recursively applies checking logic described above.
+        If the check runs without any exception, it is ensured that there will be no semantic errors.
+        During the check, type field of each node will be filled with the inferred type.
+        (For nodes corresponding to operator or function token, call field will also be filled.)
+        For detailed logic, refer to the comments above.
 
         :param ast: AST to be checked.
         :param line: Raw input string.
 
         :return: Checked AST.
 
-        :raise SemanticChkErr: Expression containing the usage of variable before its assignment raise exception
-                               with errno NOT_DEFINE.
+        :raise SemanticErr[NOT_DEFINE]: If variables are used without assignment.
         """
         self.__ast = ast
         self.__line = line
 
         self.__chk_hlpr(ast)
 
-        # One final check is needed to prevent expressions like 'x' where x is not assigned.
+        # Final [ChkVar] for the root node is needed to prevent the marginal case like 'x' where x is not assigned.
         if ast.t.t == T.NA:
             raise SemanticChkErr(ast.tok.pos, self.__line, Errno.NOT_DEFINE, var=ast.tok.v)
 

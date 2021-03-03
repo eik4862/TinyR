@@ -183,10 +183,10 @@ class Lexer:
         The first type of ambiguity stems from the fact that
         some operator characters contain other operator characters as their substring.
         For example, * can be multiplication or exponentiation with succeeding *.
-        By looking ahead some characters this type of ambiguity can be resolved easily.
+        By looking ahead('peeking') some characters this type of ambiguity can be resolved easily.
 
         The second type of ambiguity stems from the fact that our grammar if not fully context-free.
-        For example, left bracket([) can represents both array construction operator and indexing operator.
+        For example, left bracket([) can represent both array construction operator and indexing operator.
         Its interpretation depends on 'how' it is used, that is, the context in which it is used.
         Most of this type of ambiguity will be resolved by parser.
         Here, only one case will be handled: ambiguity regarding left bracket described above.

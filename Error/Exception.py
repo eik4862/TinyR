@@ -82,7 +82,7 @@ class ParserErr(Err):
         3. INCOMP_EXPR  : Input expression is incomplete. (eg. 2 + )
         4. FUN_CALL_MISS: Function call expression is not complete. (eg. idMat + 2)
         5. ARG_MISPOS   : Non-keyword argument for function call is followed by keyword arguments.
-                         (eg. triMat(1:3, strict = T, 2))
+                          (eg. triMat(1:3, strict = T, 2))
         6. MEMID_MISS   : Member id in a struct is missing. (eg. {x: 2, 3})
 
     This class is the end of inheritance. No further inheritance is allowed.
@@ -137,7 +137,7 @@ class SemanticChkErr(Err):
         4. ASGN_T_MISS : Types of both hand sides do not match in case of assignment with indexing.
                          (eg. x[2] = 3 where x is of type Arr[Num, 1].)
         5. INVALID_LVAL: LHS of an assignment cannot be interpreted as a l-value. (eg. 2 = 3)
-        6. ID_DUP      : Member ids in a strut are duplicated. (eg. {x: 2, x: 3})
+        6. ID_DUP      : Member ids in a struct are duplicated. (eg. {x: 2, x: 3})
 
     This class is the end of inheritance. No further inheritance is allowed.
     """

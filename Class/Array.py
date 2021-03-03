@@ -202,7 +202,7 @@ class Arr:
         Promotion may be needed if the length of index chain exceeds the depth of an array.
         One tricky case is the case where base type is indexed.
         However, since base types are not subclasses of Arr, this case should be handled outside of this module.
-        Class Op will do this.
+        Operator module will do this.
 
         Float can be used as an index, and it will be rounded.
         However, this may cause unexpected behaviors due to rounding.
@@ -299,7 +299,7 @@ class Arr:
         Since such information is invisible here, promotion of val will be handled outside of this module.
         It just assumes that val is already promoted properly.
         Like Arr.get, updating base type by indexing it is another tricky problem.
-        This will be also handled outside of this module. Class Interp will do this.
+        This will be also handled outside of this module. Interp class will do this.
 
         Float can be used as an index, and it will be rounded.
         However, this may cause unexpected behaviors due to rounding.
@@ -466,7 +466,7 @@ class Arr:
     Here, a stands for base type like numeric and the class in bracket indicates the class responsible for
     handling the corresponding case.
     Note that a op a cannot be handled by classes in this module, thus it should be handled somewhere else.
-    Class Op will do this.
+    Operator module will do this.
     
     This logic is for internal use only.
     """
