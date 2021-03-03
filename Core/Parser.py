@@ -110,7 +110,7 @@ class Parser:
                  and delimiter which separates id of keyword parameter and value to be passed.
         3. LPAR, RPAR: It can represent both parenthesis in arithmetic and function call.
         4. ADD, SUB: They can be both unary and binary.
-    It replaces SEQ used as a delimiter with MEMID token, ASGN used as a delimiter with KWARG token.
+    It replaces SEQ used as a delimiter with MEM token, ASGN used as a delimiter with KWARG token.
     For ADD, SUB, LPAR and RPAR, it sets connections b/w them and other AST nodes differently according to their usage.
     Then there will be no ambiguity anymore.
     
@@ -585,3 +585,8 @@ class Parser:
         print(f'[{cnt}] {ast.tok}')
 
         return cnt + 1
+
+
+"""
+COMMENT WRITTEN: 2021.3.3.
+"""

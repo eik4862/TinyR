@@ -149,27 +149,28 @@ class TSym:
             1. For any type ai, ai <: b.
             2. For any type c st. satisfies the first condition, b <: c.
         Since subtype system is not a preorder, supremum of some sets may not exist.
-        Also, supremum of an empty set does not exist.
+        Also, supremum of an empty set is defined as Void.
 
         Rules determining supremum are as follows:
-            1. Sup({a1, ..., ap, a(p+1)}) => Sup({Sup({a1, ..., ap}), a(p+1)}).                      [SupRec]
-            2. Sup({a}) => a.                                                                        [SupSngl]
-            3. Sup({a, b}) => a if b <: a.                                                           [SupSub]
-            4. Sup({a, Arr[b, n]}) => Arr[Sup(a, b), n] if a is base type.                           [SupBaseArr]
-            6. Sup({Arr[a, m], Arr[b, n]}) => Arr[Sup(a, b), max(m, n)].                             [SupArr]
+            1. Sup(a1, ..., ap, a(p+1)) => Sup(Sup(a1, ..., ap), a(p+1)).                      [SupRec]
+            2. Sup() => Void.                                                                  [SupVoid]
+            2. Sup(a) => a.                                                                    [SupSngl]
+            3. Sup(a, b) => a if b <: a.                                                       [SupSub]
+            4. Sup(a, Arr[b, n]) => Arr[Sup(a, b), n] if a is base type.                       [SupBaseArr]
+            6. Sup(Arr[a, m], Arr[b, n]) => Arr[Sup(a, b), max(m, n)].                         [SupArr]
             7. Supremum of set consists of two struct types a and b is a struct type c st.
                 7.1. Ids of c are the same with those of a(and b).
                 7.2. For any id, type of c[id] is supremum of {type of a[id], type of b[id]}.
-               if a and b have the same ids.                                                         [SupStrt]
-            8. Sup({(a1, ..., ap) => b, (c1, ..., cq) => d}) =>
-                                        ((Sup({a1, c1}), ..., Sup({ap, cq})) => sup(b, d)) if p = q. [SupFun]
+               if a and b have the same ids.                                                   [SupStrt]
+            8. Sup((a1, ..., ap) => b, (c1, ..., cq) => d) =>
+                                     ((Sup(a1, c1), ..., Sup(ap, cq)) => sup(b, d)) if p = q.  [SupFun]
 
         :param set_: Set of types whose supremum is to be computed.
 
         :return: Supremum of set_. None if it does not exists.
         """
         if len(set_) == 0:
-            return None
+            return VoidTSym()
         elif len(set_) == 1:
             # [SupSngl]
             return set_[0]
