@@ -12,6 +12,8 @@ class Lexer:
     Lexer class.
 
     Derives tokens from the input string.
+    Instead of deriving all tokens and storing them in a stack, it derives token one by one when requested.
+    Parser will request tokens by calling Lexer.next_tok function. For detail, refer to the comments of Lexer.next_tok.
 
     This class is implemented as a singleton. The singleton object will be instantiated at its first call.
     This class is the end of inheritance. No further inheritance is allowed.
@@ -30,30 +32,34 @@ class Lexer:
         return cls.__inst
 
     def __init__(self) -> None:
+        # Raw input string.
         self.__line: str = ''
+        # Following two fields are automatically managed internally. Refer to the comments of Lexer.__step.
+        # Current position from which tokenizing starts.
         self.__pos: int = 0
+        # Character in the raw input string pointed by self.__pos.
         self.__curr_char: Optional[str] = None
 
     def init(self, line: str) -> NoReturn:
-        """
-        Initialize lexer.
-
-        :param line: Raw input string to be tokenized.
-        """
         self.__line: str = line
         self.__pos: int = 0
         self.__curr_char: Optional[str] = line[0]
 
     """
-    TOKEN DERIVING LOGIC
+    HELPER FOR TOKEN DERIVING LOGIC
+    
+    This logic is for internal use only.
     """
 
     def __step(self, amt: int = 1) -> NoReturn:
         """
-        Helper for tokenizing.
-        Steps forward in the raw input string and set self.__curr_char as the newly visited character.
+        Steps forward in the raw input string by amt.
 
-        :param amt: The amount of step. (Default: 1)
+        It updates internal variables holding current position and the character at the position.
+        If current position exceeds the boundary of the input string,
+        variable holding a current character will be set to None.
+
+        :param amt: Amount of update. (Default: 1)
         """
         self.__pos += amt
 
@@ -64,12 +70,13 @@ class Lexer:
 
     def __peek(self, amt: int = 1) -> Optional[str]:
         """
-        Helper for tokenizing.
-        Looks up one or more characters in the raw input string and return the looked up characters as one string.
+        Looks ahead amt characters.
 
-        :param amt: The amount of characters to be looked up. (Default: 1)
+        If there are no amt characters in the raw input string succeeding current character, it returns None.
 
-        :return: Looked up characters. If it hits the end of the raw input string, it returns None.
+        :param amt: Amount of characters to look ahead. (Default: 1)
+
+        :return: Looked up characters. None if look ahead is not possible.
         """
         peek_pos: int = self.__pos + amt
 
@@ -78,22 +85,31 @@ class Lexer:
         else:
             return self.__line[self.__pos + 1:peek_pos + 1]
 
+    """
+    TOKEN DERIVING LOGIC
+    
+    Grammar for token derivation is as follows:
+        White = [ \t\r\n\v\f]
+        Num = [0-9]+(.[0-9]*)?
+            | .[0-9]+
+        Str = ('|")[A-Za-z0-9]*('|")
+        Id = [A-Za-z]+[A-Za-z0-9_]*
+        Op = ^ | **? | + | - | : | %(* | /)?% | * | / | <=? | ==? | >=? | ! | &&? | ||? | ( | ) | [ | ] | { | } | ,
+    
+    Most of this logic is for internal use only.
+    """
+
     def __skip_white(self) -> NoReturn:
-        """
-        Skips consecutive white spaces(\n, ' ') in the raw input string.
-        """
         while self.__curr_char and self.__curr_char.isspace():
             self.__step()
 
-    """
-    TOKEN DERIVING LOGIC
-    """
     def __tok_num(self) -> Tok:
         """
+        Derives numeric tokens.
 
         :return: Derived numeric token.
 
-        :raise ParserErr: Single dot(.) raises exception with errno INVALID_TOK.
+        :raise ParserErr[INVALID_TOK]: If a dot(.) is solely given.
         """
         pivot: int = self.__pos
 
@@ -115,13 +131,11 @@ class Lexer:
 
     def __tok_str(self) -> Tok:
         """
-        Derives string token.
-        String token should be enclosed by double quote(") or single quote(').
-        Currently, escaping is not supported.
+        Derives string tokens.
 
         :return: Derived string token.
 
-        :raise ParserErr: Input without closing quote raises exception with errno NCLOSED_PARN.
+        :raise ParserErr[NCLOSED_PARN]: If quote is not closed.
         """
         pivot: int = self.__pos
         quote: str = self.__curr_char
@@ -140,12 +154,12 @@ class Lexer:
 
     def __tok_id(self) -> Tok:
         """
-        Derives boolean and variable token.
-        It refers Lexer.__KWORD dictionary to determine whether user input is built-in keyword or variable.
-        Note that variable or keyword should start with alphabet. However, digits or underscore(_) can be followed.
-        Built-in keywords include boolean symbols, like TRUE and F.
+        Derives boolean, function, and variable tokens.
 
-        :return: Derived boolean or variable token.
+        It looks up keyword table to determine
+        whether the id represents keyword (or built-in function call) or variable.
+
+        :return: Derived boolean, function, or variable token.
         """
         pivot: int = self.__pos
 
@@ -163,13 +177,21 @@ class Lexer:
 
     def __tok_op(self) -> Tok:
         """
-        Derives operator token.
-        For some operators, their value can be determined immediately. (eg. +)
-        For others, lexer should 'peek' some more characters to fully determine their values. (eg. %*%)
+        Derives operator, array, and struct tokens.
 
-        :return: Derived operator token.
+        Some operators are ambiguous.
+        Most of ambiguity stems from the fact that
+        some operator characters contain other operator characters as their substring.
+        For example, * can be multiplication or exponentiation with succeeding *.
+        Looking ahead some characters resolves most of these ambiguity issues.
+        What left is ambiguity regarding indexing operator and array construction operator.
+        These two share the same operator character, left bracket([). Thus, it is context-sensitive grammar.
+        To resolve this, it resorts on the fact that indexing can appear only after right parenthesis()),
+        right bracket(]), id of a variable([A-Za-z0-9_]), and numeric([0-9] | .).
 
-        :raise ParserErr: Operators enclosed by % which are not given properly raises exception with errno INVALID_TOK.
+        :return: Derived operator, array, or struct token.
+
+        :raise ParserErr[INVALID_TOK]: If % is solely used.
         """
         if self.__curr_char == '^':
             self.__step()
@@ -278,13 +300,8 @@ class Lexer:
 
             return Tok(TokT.OP, OpT.RPAR, self.__pos - 1)
         elif self.__curr_char == '[':
-            # Left bracket([) needs a special treat.
-            # It can be either array construction operator or indexing operator.
-            # These two can be differentiated by considering one character preceding the left bracket.
-            # If it is preceded by alphabet, digit, left parenthesis()), left bracket(]), or underscore(_),
-            # then it must be array construction operator, and vice versa.
             if self.__pos != 0 and \
-                    (self.__line[self.__pos - 1] in [')', ']', '_'] or self.__line[self.__pos - 1].isalnum()):
+                    (self.__line[self.__pos - 1] in [')', ']', '_', '.'] or self.__line[self.__pos - 1].isalnum()):
                 self.__step()
 
                 return Tok(TokT.OP, OpT.IDX, self.__pos - 1)
@@ -311,12 +328,13 @@ class Lexer:
 
     def next_tok(self) -> Tok:
         """
-        Derives next token based on the current position.
-        Current position will be automatically updated internally.
+        Derives a token starting from the position pointed by self.__curr_char.
 
-        :return: Newly derived token. If it hits the end of the raw input string, it returns EOF token.
+        Starting position will be automatically updated internally.
 
-        :raise ParserErr: Any invalid input raises exception with errno INVALID_TOK.
+        :return: Derived token. EOF token if it hits the end of the input string.
+
+        :raise ParserErr[INVALID_TOK]: If unexpected characters are encountered.
         """
         while self.__curr_char:
             if self.__curr_char.isspace():
@@ -329,7 +347,7 @@ class Lexer:
                 return self.__tok_op()
             elif self.__curr_char == '\'' or self.__curr_char == '"':
                 return self.__tok_str()
-            elif self.__curr_char.isalnum():
+            elif self.__curr_char.isapha():
                 return self.__tok_id()
             else:
                 raise ParserErr(self.__pos, self.__line, Errno.INVALID_TOK)
