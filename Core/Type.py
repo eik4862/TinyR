@@ -45,6 +45,7 @@ class OpT(IntEnum):
     """
     Operator types.
     """
+    # Arithmetic operators
     EXP = auto()     # ^ and **
     ADD = auto()     # +
     SUB = auto()     # -
@@ -54,15 +55,21 @@ class OpT(IntEnum):
     QUOT = auto()    # %/%
     MUL = auto()     # *
     DIV = auto()     # /
+
+    # Comparison operators
     LSS = auto()     # <
     LEQ = auto()     # <=
     GRT = auto()     # >
     GEQ = auto()     # >=
     EQ = auto()      # ==
     NEQ = auto()     # !=
+
+    # Boolean operators
     NEG = auto()     # !
     AND = auto()     # & and &&
     OR = auto()      # | and ||
+
+    # Special operators
     IDX = auto()     # [
     LPAR = auto()    # (
     RPAR = auto()    # )
@@ -89,20 +96,20 @@ class Errno(IntEnum):
     INCOMP_EXPR = auto()    # Input expression is incomplete.
     NOT_DEFINE = auto()     # Variable is used before assignment.
     FUN_CALL_MISS = auto()  # Function call expression is not complete.
-    KWARG_MISS = auto()     # Keyword id in function call is missing.
+    ARG_MISPOS = auto()     # Non-keyword argument for function call is followed by keyword arguments.
     MEMID_MISS = auto()     # Member id in a struct is missing.
-    INVALID_LVAL = auto()   # L-value in assignment is erroneous.
-    ID_DUP = auto()         # Member id in a strut is duplicated.
-    ASGN_T_MISS = auto()    # Assignment error.
+    INVALID_LVAL = auto()   # LHS of an assignment cannot be interpreted as a l-value.
+    ID_DUP = auto()         # Member ids in a strut are duplicated.
+    ASGN_T_MISS = auto()    # Types of both hand sides do not match in case of assignment with indexing.
     ASGN_N_MISS = auto()    # Assignment error.
-    INHOMO_ELEM = auto()    # Elements in an array (or its subclasses) do not have identical type.
-    SGNTR_NFOUND = auto()   # Function call signature is wrong.
+    INHOMO_ELEM = auto()    # Types of elements in an array are not identical.
+    SGNTR_NFOUND = auto()   # Operator or function call signature is wrong.
     KERNEL_ERR = auto()     # Python kernel raised exception during computation.
     DIM_MISMATCH = auto()   # Dimension is not compatible for some computation.
     EMPTY_IDX = auto()      # Index list for indexing is empty.
-    IDX_BOUND = auto()      # Index is not valid.
+    IDX_BOUND = auto()      # Index is out of bound.
     FUN_ERR = auto()        # Function raised exception during computation.
-    NOT_IMPLE = auto()      # Functionality which is not implemented.
+    NOT_IMPLE = auto()      # The functionality is not implemented.
 
     def __str__(self) -> str:
         return self.name

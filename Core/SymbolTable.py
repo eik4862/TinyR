@@ -21,10 +21,10 @@ class SymTab:
     For detail, refer to the comments of Initialization module.
 
     Type table is used by semantic checker to infer types of variables.
-    It uses id of variable as a key and has one entry, the type of the variable.
+    It uses the id of variable as a key and has one entry, the type of the variable.
     Symbol table is used by interpreter to load values assigned to variables.
-    It uses id of variables as a key and has one entry, the value of the variable.
-    Since this language supports a single scope(global),
+    It uses the id of variable as a key and has one entry, the value of the variable.
+    Since this language does not support scoping (all variables are in global scope)
     there is no need to store additional information in type table and symbol table.
 
     This class is implemented as a singleton. The singleton object will be instantiated at its first call.
@@ -52,22 +52,33 @@ class SymTab:
 
     """
     LOOKUP & UPDATE
+    
+    Lookup function takes key and returns the stored entries.
+    If it cannot find entry with the passed key, it returns None instead.
+    
+    Update function takes key and entry information and stores it.
+    If entries with the passed key already exist in the table, then they will be overwritten.
     """
 
-    def lookup_kw(self, id_: str) -> Optional[Tuple[TokT, Any]]:
-        return self.__kword.get(id_, None)
+    def lookup_kw(self, k: str) -> Optional[Tuple[TokT, Any]]:
+        return self.__kword.get(k, None)
 
-    def lookup_t(self, id_: str) -> Optional[TSym]:
-        return self.__t.get(id_, None)
+    def lookup_t(self, k: str) -> Optional[TSym]:
+        return self.__t.get(k, None)
 
-    def lookup_v(self, id_: str) -> Any:
-        return self.__v.get(id_, None)
+    def lookup_v(self, k: str) -> Any:
+        return self.__v.get(k, None)
 
-    def update_kw(self, id_: str, v: Any, t: TokT = TokT.FUN) -> NoReturn:
-        self.__kword[id_] = (t, v)
+    def update_kw(self, k: str, v: Any, t: TokT = TokT.FUN) -> NoReturn:
+        self.__kword[k] = (t, v)
 
-    def update_t(self, id_: str, t: TSym) -> NoReturn:
-        self.__t[id_] = t
+    def update_t(self, k: str, t: TSym) -> NoReturn:
+        self.__t[k] = t
 
-    def update_v(self, id_: str, v: Any) -> NoReturn:
-        self.__v[id_] = v
+    def update_v(self, k: str, v: Any) -> NoReturn:
+        self.__v[k] = v
+
+
+"""
+COMMENT WRITTEN: 2021.3.2.
+"""

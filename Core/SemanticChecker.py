@@ -78,8 +78,7 @@ class SemanticChk:
             t, hndl = Logi.t_chk(ast.tok.v, ch_t)
 
         if t is None or hndl is None:
-            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND,
-                                 infer=ast.tok.v.name + '[' + ', '.join(list(map(str, ch_t))) + ']')
+            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND, infer=str(FunTSym(ch_t, TSym())))
 
         ast.t = t
         ast.call = hndl
@@ -99,8 +98,7 @@ class SemanticChk:
         t, hndl = Sp.t_chk(ast.tok.v, ch_t, ast.lval)
 
         if t is None or hndl is None:
-            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND,
-                                 infer=ast.tok.v.name + '[' + ', '.join(list(map(str, ch_t))) + ']')
+            raise SemanticChkErr(ast.tok.pos, self.__line, Errno.SGNTR_NFOUND, infer=str(FunTSym(ch_t, TSym())))
 
         ast.t = t
         ast.call = hndl

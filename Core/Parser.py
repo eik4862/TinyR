@@ -427,7 +427,7 @@ class Parser:
                 self.__eat()
 
                 if self.__curr_tok.t != TokT.VAR or not fun.is_kw(self.__curr_tok.v):
-                    raise ParserErr(self.__curr_tok.pos, self.__line, Errno.KWARG_MISS)
+                    raise ParserErr(self.__curr_tok.pos, self.__line, Errno.ARG_MISPOS)
 
                 id_tok = self.__curr_tok
 

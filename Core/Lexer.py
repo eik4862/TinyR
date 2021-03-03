@@ -11,8 +11,10 @@ class Lexer:
     """
     Lexer class.
 
-    Reads raw input string and derives tokens.
-    It is implemented as singleton.
+    Derives tokens from the input string.
+
+    This class is implemented as a singleton. The singleton object will be instantiated at its first call.
+    This class is the end of inheritance. No further inheritance is allowed.
     """
     # Singleton object.
     __inst: ClassVar[Lexer] = None
@@ -83,10 +85,11 @@ class Lexer:
         while self.__curr_char and self.__curr_char.isspace():
             self.__step()
 
+    """
+    TOKEN DERIVING LOGIC
+    """
     def __tok_num(self) -> Tok:
         """
-        Derives numeric token.
-        It does not differentiate float and integer. Both will be tokenized as numeric token.
 
         :return: Derived numeric token.
 

@@ -20,9 +20,9 @@ class TSym:
     """
     Root class for type symbols.
 
-    In most cases, this class should not be instantiated.
+    In most cases, this class should not be directly instantiated.
     Instead, use this class as a wild card meaning 'any type symbol'.
-    Nevertheless, there are some special occasions where instance of this class is quite useful.
+    Nevertheless, there are some special occasions where direct instantiation of this class is quite useful.
     In such occasions, extra care must be taken since the instance has NA type, unless specified.
     """
 
