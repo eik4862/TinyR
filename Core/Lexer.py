@@ -353,7 +353,7 @@ class Lexer:
                 return self.__tok_op()
             elif self.__curr_char == '\'' or self.__curr_char == '"':
                 return self.__tok_str()
-            elif self.__curr_char.isapha():
+            elif self.__curr_char.isalpha():
                 return self.__tok_id()
             else:
                 raise ParserErr(self.__pos, self.__line, Errno.INVALID_TOK)

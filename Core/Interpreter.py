@@ -66,7 +66,7 @@ class Interp:
 
         All exceptions (including built-in exceptions of Python) should be caught here
         and the erroneous position in the raw input string with the string itself should be properly assigned.
-        Then it will be rethrown.
+        Then the exceptions will be rethrown.
 
         :raise InterpErr[KERNEL_ERR]: If Python raises exceptions during computation.
         """
@@ -87,10 +87,28 @@ class Interp:
         except Exception as e:
             raise InterpErr(ast.tok.pos, self.__line, Errno.KERNEL_ERR, k_msg=str(e))
 
-    # TODO: interpreting order?
     def __interp_asgn(self, ast: AST) -> NoReturn:
-        self.__interp_hlpr(ast.ch[1])
+        """
+        Updates the symbol table.
+
+        If LHS of an assignment does not entail indexing, assignment is easy and straightforward.
+        Otherwise, it has some complications.
+
+        If LHS of an assignment entails indexing, indexing operation with true lval flag
+        results in a pair of variable id and the index indicating the assignment address.
+        (Operator module checks lval flag and routes different computation logic according to the flag.)
+        It computes the updated value by calling Arr.update (or its overrides) and update the symbol table.
+        However, before calling Arr.update, RHS of an assignment should be promoted, if needed.
+        Note that type inference does not operates differently according to lval flag.
+        Thus the inferred type of LHS represents the type if one computes indexing as if it is not l-value.
+        And using the depth of the inferred type, we can easily determine # of promotion needed.
+
+        All array exceptions raised by Arr.update (and its overrides) should be caught here
+        and the erroneous position in the raw input string with the string itself should be properly assigned.
+        Then the exceptions will be rethrown.
+        """
         self.__interp_hlpr(ast.ch[0])
+        self.__interp_hlpr(ast.ch[1])
 
         if type(ast.ch[0].tok.v) == str:
             SymTab.inst().update_v(ast.ch[0].tok.v, ast.ch[1].tok.v)
@@ -169,15 +187,6 @@ class Interp:
         else:
             ast.tok.v = Arr(elem, [len(ast.ch), *dim_old])
 
-    def __interp_strt(self, ast: AST) -> NoReturn:
-        """
-        Constructs struct.
-        """
-        for node in ast.ch:
-            self.__interp_hlpr(node)
-
-        ast.tok.v = Strt({node.tok.v[0]: node.tok.v[1] for node in ast.ch}, [node.tok.v[0] for node in ast.ch])
-
     def __interp_hlpr(self, ast: AST) -> NoReturn:
         """
         Routes interpreting logic according to the type of currently visiting node ast.
@@ -204,7 +213,10 @@ class Interp:
         elif ast.tok.t == TokT.ARR:
             self.__interp_arr(ast)
         elif ast.tok.t == TokT.STRT:
-            self.__interp_strt(ast)
+            for node in ast.ch:
+                self.__interp_hlpr(node)
+
+            ast.tok.v = Strt({node.tok.v[0]: node.tok.v[1] for node in ast.ch}, [node.tok.v[0] for node in ast.ch])
         elif ast.tok.t == TokT.FUN:
             for node in ast.ch:
                 self.__interp_hlpr(node)

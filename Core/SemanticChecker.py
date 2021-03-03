@@ -261,7 +261,7 @@ class SemanticChk:
         For function t_chk, refer to the comments of SemanticChk.__chk_op.
         All SemanticChkErr exceptions with errno INVALID_LVAL should be caught here
         and the erroneous position in the raw input string should be properly assigned.
-        Then it will be rethrown.
+        Then the exceptions will be rethrown.
 
         :raise SemanticChkErr[INVALID_LVAL]: If LHS of an assignment cannot be a l-value.
         :raise SemanticChkErr[NOT_DEFINE]: If variables are used without assignment.
@@ -538,8 +538,9 @@ class SemanticChk:
 
         Traverses AST in postorder and recursively applies checking logic described above.
         If the check runs without any exception, it is ensured that there will be no semantic errors.
-        During the check, type field of each node will be filled with the inferred type.
-        (For nodes corresponding to operator or function token, call field will also be filled.)
+        During the check, type field and lval field of each node will be filled
+        with the inferred type and a boolean indicating l-value, resp.
+        (For operator or function nodes, call field will also be filled.)
         For detailed logic, refer to the comments above.
 
         :param ast: AST to be checked.
