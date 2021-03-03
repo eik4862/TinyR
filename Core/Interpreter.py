@@ -42,10 +42,11 @@ class Interp:
     then it calls the function attached to the node and passes all values contained in the children.
     The result of the computation will be set as a value of the node.
     Especially, if it encounters an assignment, it also updates the symbol table.
-    If it encounters nodes with array or struct, it constructs array (or its subclasses) or struct object 
+    If it encounters nodes with array or struct, it constructs an array (or its subclasses) or a struct object 
     using values of the children and assigns the object as a value of the node.
     If it encounters member of struct, it reassigns the value of the node as a pair of id and the value of the child.
-    If it encounters variable, it looks up the symbol table and reassigns the value of the node as the looked up value.
+    If it encounters variable (and it has false lval flag), 
+    it looks up the symbol table and reassigns the value of the node as the looked up value.
     If it encounters other terminal nodes, it does nothing.
     
     However, there are some complications regarding assignment, array (or its subclasses) construction.
@@ -89,7 +90,7 @@ class Interp:
 
     def __interp_asgn(self, ast: AST) -> NoReturn:
         """
-        Updates the symbol table.
+        Assigns values.
 
         If LHS of an assignment does not entail indexing, assignment is easy and straightforward.
         Otherwise, it has some complications.
@@ -101,7 +102,9 @@ class Interp:
         However, before calling Arr.update, RHS of an assignment should be promoted, if needed.
         Note that type inference does not operates differently according to lval flag.
         Thus the inferred type of LHS represents the type if one computes indexing as if it is not l-value.
-        And using the depth of the inferred type, we can easily determine # of promotion needed.
+        Using the depth of the inferred type, we can easily determine # of promotion needed.
+        Also, after calling Arr.update, the result must be degraded to its original depth
+        since it can be promoted silently by Arr.update.
 
         All array exceptions raised by Arr.update (and its overrides) should be caught here
         and the erroneous position in the raw input string with the string itself should be properly assigned.
@@ -111,9 +114,11 @@ class Interp:
         self.__interp_hlpr(ast.ch[1])
 
         if type(ast.ch[0].tok.v) == str:
+            # Assignment without indexing
             SymTab.inst().update_v(ast.ch[0].tok.v, ast.ch[1].tok.v)
             ast.tok.v = ast.ch[1].tok.v
         else:
+            # Assignment with indexing.
             id_, idx = ast.ch[0].tok.v
             tar, val = SymTab.inst().lookup_v(id_), ast.ch[1].tok.v
 
@@ -122,16 +127,14 @@ class Interp:
 
             try:
                 if isinstance(tar, Arr):
-                    SymTab.inst().update_v(id_, tar.update(idx, val))
+                    new: Arr = tar.update(idx, val)
+                    n: int = new.dept - tar.dept
                 else:
-                    # A little trick here.
-                    # When base type is indexed and then assigned,
-                    # the target(base type) needs AT LEAST one promotion.
-                    # Then it may be further promoted internally.
-                    # After the assignment, we need to degrade it back to keep base type as base type.
-                    tar = Vec([tar]).update(idx, val)
+                    # Since base type has no update function, promote it once manually and then update.
+                    new: Arr = Vec([tar]).update(idx, val)
+                    n: int = tar.dept
 
-                    SymTab.inst().update_v(id_, tar.degrade(tar.dept))
+                SymTab.inst().update_v(id_, new.degrade(n))
             except InterpErr as e:
                 e.pos = ast.tok.pos
                 e.line = self.__line
@@ -191,11 +194,16 @@ class Interp:
         """
         Routes interpreting logic according to the type of currently visiting node ast.
 
+        Interpreting logic for variable, struct member, struct, and function is implemented here
+        since they are relatively simple.
+        Note that variable should be interpreted only when lval is set to false.
+        Also, all function exceptions raised by built-ins should be caught here
+        and the erroneous position in the raw input string with the string itself should be properly assigned.
+        Then the exceptions will be rethrown.
+
         :param ast: AST to be interpreted.
 
-        :raise InterpErr: Expression containing functionality which is not implemented yet raises exception
-                          with errno NOT_IMPLE.
-        :raise InterpErr: If kernel raises exception during computation, it raises exception with errno KERNEL_ERR.
+        :raise InterpErr[KERNEL_ERR]: If Python raises exceptions during computation.
         """
         if ast.tok.t == TokT.VAR and not ast.lval:
             ast.tok.v = SymTab.inst().lookup_v(ast.tok.v)
@@ -235,10 +243,15 @@ class Interp:
         """
         Interprets AST.
 
+        Traverses AST in postorder and recursively applies interpreting logic described above.
+        If the interpretation runs without any exception, the root note ast will contain the final value.
+        It formats the result by calling Printer.format function and returns the formatted string.
+        For detail on formatting, refer to the comments of Printer.format.
+
         :param ast: AST to be interpreted.
         :param line: Raw input string.
 
-        :return: Formatted interpretation result.
+        :return: Formatted result.
         """
         self.__ast = ast
         self.__line = line

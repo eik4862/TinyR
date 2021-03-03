@@ -283,7 +283,7 @@ class Arr:
     Rules are applied following the order as above.
     """
 
-    def update(self, idx: List, val: Any) -> Any:
+    def update(self, idx: List, val: Any) -> Arr:
         """
         Updates elements indicated by idx to val.
 
@@ -821,7 +821,7 @@ class Mat(Arr):
     Refer to the comments of Arr class.
     """
 
-    def update(self, idx: List, val: Any) -> Any:
+    def update(self, idx: List, val: Any) -> Arr:
         """
         Updates elements indicated by idx to val.
 
@@ -1363,7 +1363,7 @@ class Vec(Mat):
     Refer to the comments of Arr class.
     """
 
-    def update(self, idx: List, val: Any) -> Any:
+    def update(self, idx: List, val: Any) -> Arr:
         """
         Updates elements indicated by idx to val.
 
@@ -1373,7 +1373,7 @@ class Vec(Mat):
         :param idx: Index chain.
         :param val: Value to be assigned.
 
-        :return: Updated matrix.
+        :return: Updated vector.
 
         :raise ArrErr[EMPTY_IDX]: If index list is empty.
         :raise ArrErr[IDX_BOUND]: If index is out of bound.
