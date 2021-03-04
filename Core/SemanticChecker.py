@@ -52,7 +52,7 @@ class SemanticChk:
         3. [TAsgn]
            If   e1 = x
                 env |- e => env', a
-           Then env |- e1 = e2 => env' U {Var: a}, a
+           Then env |- e1 = e2 => env' U {x: a}, a
         4. [TAsgnIdx]
            If   e1 = e'1[e'2]
                 env |- e1 => env', b

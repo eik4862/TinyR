@@ -160,7 +160,7 @@ class Arith:
         if sup_t is None:
             return None
 
-        if sup_t.base and sup_t <= NumTSym():
+        if sup_t <= NumTSym():
             # [TBinArithBase]
             return NumTSym()
         elif sup_t.t == T.ARR and sup_t.elem <= NumTSym():
@@ -171,14 +171,12 @@ class Arith:
 
     @staticmethod
     def __t_chk_hlpr_uni(t: TSym) -> Optional[TSym]:
-        if t.base:
-            # [TUniArithBase]
-            return NumTSym() if t <= NumTSym() else None
-        elif t.t == T.ARR:
+        if t.t == T.ARR:
             # [TUniArithArr]
             return ArrTSym(NumTSym(), t.dept) if t.elem <= NumTSym() else None
-
-        return None
+        else:
+            # [TUniArithBase]
+            return NumTSym() if t <= NumTSym() else None
 
     @staticmethod
     def __t_chk_hlpr_add(t1: TSym, t2: TSym) -> Optional[TSym]:
@@ -187,16 +185,7 @@ class Arith:
         if sup_t is None:
             return None
 
-        if sup_t.base:
-            if sup_t <= NumTSym():
-                # [TAddNum]
-                return NumTSym()
-            elif sup_t == StrTSym():
-                # [TAddStr]
-                return StrTSym()
-            else:
-                return None
-        elif sup_t.t == T.ARR:
+        if sup_t.t == T.ARR:
             if sup_t.elem <= NumTSym():
                 # [TAddNumArr]
                 return ArrTSym(NumTSym(), sup_t.dept)
@@ -205,9 +194,17 @@ class Arith:
                 return ArrTSym(StrTSym(), sup_t.dept)
             else:
                 return None
+        else:
+            if sup_t <= NumTSym():
+                # [TAddNum]
+                return NumTSym()
+            elif sup_t == StrTSym():
+                # [TAddStr]
+                return StrTSym()
+            else:
+                return None
 
-        return None
-
+    # TODO: Refactor this
     @staticmethod
     def __t_chk_hlpr_mul(t1: TSym, t2: TSym) -> Optional[TSym]:
         if t1.base:
@@ -335,12 +332,12 @@ class Comp:
         if sup_t is None:
             return None
 
-        if sup_t.base and (sup_t <= NumTSym() or sup_t == StrTSym()):
-            # [TCompBase]
-            return BoolTSym()
-        elif sup_t.t == T.ARR and (sup_t.elem <= NumTSym() or sup_t.elem == StrTSym()):
+        if sup_t.t == T.ARR and (sup_t.elem <= NumTSym() or sup_t.elem == StrTSym()):
             # [TCompArr]
             return ArrTSym(BoolTSym(), sup_t.dept)
+        elif sup_t <= NumTSym() or sup_t == StrTSym():
+            # [TCompBase]
+            return BoolTSym()
 
         return None
 
@@ -429,23 +426,23 @@ class Logi:
         if sup_t is None:
             return None
 
-        if sup_t.base and sup_t <= NumTSym():
-            # [TBinLogiBase]
-            return BoolTSym()
-        elif sup_t.t == T.ARR and sup_t.elem <= NumTSym():
+        if sup_t.t == T.ARR and sup_t.elem <= NumTSym():
             # [TBinLogiArr]
             return ArrTSym(BoolTSym(), sup_t.dept)
+        elif sup_t <= NumTSym():
+            # [TBinLogiBase]
+            return BoolTSym()
 
         return None
 
     @staticmethod
     def __t_chk_hlpr_uni(t: TSym) -> Optional[TSym]:
-        if t.base:
-            return BoolTSym() if t <= NumTSym() else None
-        # [TUniLogiBase]
-        elif t.t == T.ARR:
+        if t.t == T.ARR:
             # [TUniLogiArr]
             return ArrTSym(BoolTSym(), t.dept) if t.elem <= NumTSym() else None
+        elif t.base:
+            # [TUniLogiBase]
+            return BoolTSym() if t <= NumTSym() else None
 
         return None
 
@@ -512,29 +509,47 @@ class Sp:
     TYPE CHECKING & ROUTING LOGIC
     
     Type inference rules are as follows:
-        1. [TIdxBase]
-           If   env |- e1 => env', a
-                env' |- e2 => env'', b
-                Sup(a, b) <: Num
-           Then env0 |- e[e1, ..., ep] => env'', Num
-        2. [TAsgn]
-        
+        1. [TIdxBaseBase]
+           If   env |- e => env0, a
+                env(i - 1) |- ei => envi, bi for all i
+                a is not array type
+                bi <: Num for all i
+           Then env |- e[e1, ..., ep] => envp, a
+        2. [TIdxBaseArr]
+           If   env |- e => env0, a
+                env(i - 1) |- ei => envi, bi for all i
+                env(i + j - 1) |- e'j => env(i + j), cj for all j
+                a is not array type
+                bi <: Num for all i
+                cj <: Arr[Num, 1] or cj = Void for all j
+           Then env |- e[e1, ..., ep, e'1, ..., e'q] => env(p + q), Arr[a, q]
+        3. [TIdxArrBase]
+           If   env |- e => env0, Arr[a, n]
+                env(i - 1) |- ei => envi, bi for all i
+                env(i + j - 1) |- e'j => env(i + j), cj for all j
+                bi <: Num for all i
+                cj <: Arr[Num, 1] or cj = Void for all j
+                max(p + q, n) = p
+           Then env |- e[e1, ..., ep, e'1, ..., e'q] => env(p + q), a
+        4. [TIdxArrArr]
+           If   env |- e => env0, Arr[a, n]
+                env(i - 1) |- ei => envi, bi for all i
+                env(i + j - 1) |- e'j => env(i + j), cj for all j
+                bi <: Num for all i
+                cj <: Arr[Num, 1] or cj = Void for all j
+                max(p + q, n) > p
+           Then env |- e[e1, ..., ep, e'1, ..., e'q] => env(p + q), Arr[a, max(p + q, n) - p]
+    
+    Routing table for comparison operators are as follows:
+        Operator  l-value  Handle
+        IDX       TRUE     Sp.__addr
+                  FALSE    Sp.__idx
+    
+    Most of the logic below is for internal use only.
     """
 
     @staticmethod
     def __t_chk_hlpr_idx(t1: TSym, t2: List[TSym]) -> Optional[TSym]:
-        """
-        Type checking for indexing operation.
-
-        Let a be a base type, bi <: Num, and (ci <: Arr[Num, 1] or ci = Void).
-        a[b1, ..., bp] => a if a is base type.
-        a[b1, ..., bp, c1, ..., cq] => Arr[a, q] if a is base type.
-        Arr[a, n][b1, ..., bp, c1, ..., cq] = Arr[a, max(p + q, n) - p] if max(p + q, n) > p
-        Arr[a, n][b1, ..., bp, c1, ..., cq] => a if max(p + q, n) = p
-        """
-        if not (t1.base or t1.t == T.ARR):
-            return None
-
         dept: int = max(t1.dept, len(t2)) if t1.t == T.ARR else len(t2)
 
         for t in t2:
@@ -547,32 +562,22 @@ class Sp:
             else:
                 return None
 
-        if t1.base:
-            return ArrTSym(t1, dept) if dept > 0 else t1
-        else:
+        if t1.t == T.ARR:
+            # [TIdxBaseBase], [TIdxBaseArr]
             return ArrTSym(t1.elem, dept) if dept > 0 else t1.elem
-
-    @staticmethod
-    def __t_chk_hlpr_asgn(t1: TSym, t2: TSym) -> Optional[TSym]:
-        """
-        Type checking for assignment operation.
-
-        a = b => b if b <: a
-        """
-        return t2 if t2 <= t1 else None
+        else:
+            # [TIdxArrBase], [TIdxArrArr]
+            return ArrTSym(t1, dept) if dept > 0 else t1
 
     @staticmethod
     def t_chk(op: OpT, arg: List[TSym], lval: bool = False) -> Tuple[Optional[TSym], Optional[Callable]]:
         """
         Refer to the comments of Arith.t_chk.
         """
-        if op == OpT.IDX:
-            if len(arg) < 2:
-                return None, None
+        if len(arg) >= 2:
+            if op == OpT.IDX:
+                return Sp.__t_chk_hlpr_idx(arg[0], arg[1:]), (Sp.__addr if lval else Sp.__idx)
             else:
-                return Sp.__t_chk_hlpr_idx(arg[0], arg[1:len(arg)]), (Sp.__addr if lval else Sp.__idx)
+                return None, None
         else:
-            if len(arg) != 2:
-                return None, None
-            else:
-                return Sp.__t_chk_hlpr_asgn(*arg), None
+            return None, None
